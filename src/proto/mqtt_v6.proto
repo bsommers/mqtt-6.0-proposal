@@ -1,0 +1,168 @@
+syntax = "proto3";
+
+package mqtt.v6;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MQTT v6.0 Protobuf Schema
+//
+// Defines the binary structures for v6.0-specific packet fields and
+// extension metadata. These are used in native v6.0 mode as typed
+// property values and in compatibility mode as serialized MQTT payloads.
+// ─────────────────────────────────────────────────────────────────────────────
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Stream Metadata
+// Carried in Property 0x30 (Sequence) and 0x35 (Epoch) of PUBLISH packets.
+// ─────────────────────────────────────────────────────────────────────────────
+
+message StreamMetadata {
+  // Property 0x30: 32-bit monotonic sequence number.
+  // Immutable across the cluster once assigned by the Leader Node.
+  // Assigned per $queue/ message; unique within a (queue_name, epoch) pair.
+  uint32 sequence_number = 1;
+
+  // Property 0x35: 16-bit cluster era identifier.
+  // Incremented when the Leader Node cannot guarantee sequence continuity
+  // after a failover. Clients MUST reset idempotency state on epoch change.
+  uint32 epoch = 2;
+
+  // Identifier of the node that mastered this sequence assignment.
+  // Used for cluster debugging and audit trails. Not normative.
+  string leader_node_id = 3;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FETCH Packet (Control Packet Type 16)
+// Client → Broker: pull-based request for a batch of messages.
+// ─────────────────────────────────────────────────────────────────────────────
+
+message FetchPacket {
+  // Standard MQTT Packet Identifier for acknowledgement correlation.
+  uint32 packet_id = 1;
+
+  // The named queue or topic filter to pull from.
+  // Must be a $queue/ topic (e.g., "$queue/production_line_4").
+  string topic_filter = 2;
+
+  // Property 0x42: Maximum number of messages the broker should return.
+  // The broker MUST NOT return more than this count.
+  uint32 batch_size = 3;
+
+  // Property 0x36: Max time (ms) the broker should wait if the queue is
+  // currently empty before returning an empty response (long-polling).
+  // 0 = return immediately if empty (short-poll).
+  uint32 long_poll_timeout_ms = 4;
+
+  // Client's current high-watermark: the last sequence number it successfully
+  // processed. Allows the broker to validate gap-free resumption.
+  uint32 last_received_sequence = 5;
+
+  // Client's current known epoch. If this differs from the broker's epoch,
+  // the broker MUST signal an Epoch Reset in the FetchResponse.
+  uint32 client_epoch = 6;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FETCH Response
+// Broker → Client: batch of messages in response to a FetchPacket.
+// ─────────────────────────────────────────────────────────────────────────────
+
+message FetchResponse {
+  // Echo of the FetchPacket.packet_id for correlation.
+  uint32 packet_id = 1;
+
+  // Response reason code:
+  //   0x00 = Success
+  //   0xA0 = Epoch Reset (client must clear idempotency state)
+  //   0x8D = Queue Full / Quota Exceeded
+  //   0x9B = Throughput limit exceeded; slow down
+  uint32 reason_code = 2;
+
+  // The batch of raw message payloads.
+  // In practice, each element would be a full PUBLISH packet.
+  repeated bytes payloads = 3;
+
+  // Stream metadata for the batch (applies to the last message in the batch).
+  // Clients should use batch_stream_info.sequence_number as the new HWM
+  // after processing the full batch.
+  StreamMetadata batch_stream_info = 4;
+
+  // If reason_code == 0xA0, this contains the new epoch the client must adopt.
+  uint32 new_epoch = 5;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUBLISH Extension (v6.0)
+// Metadata attached to PUBLISH packets targeting $queue/ topics.
+// ─────────────────────────────────────────────────────────────────────────────
+
+message V6PublishExtension {
+  // Stream sequence and epoch metadata (Properties 0x30 and 0x35).
+  StreamMetadata stream_info = 1;
+
+  // Optional message priority (0–255). Higher values = higher delivery priority
+  // within the persistent queue. Default: 0.
+  uint32 priority = 2;
+
+  // Optional idempotency key for application-level exactly-once processing.
+  // If provided, the broker MAY use this for deduplication before assigning
+  // the stream sequence number.
+  string idempotency_key = 3;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONNECT Extension (v6.0)
+// User Properties in the CONNECT packet for v6.0 session negotiation.
+// ─────────────────────────────────────────────────────────────────────────────
+
+message V6ConnectExtension {
+  // Must be "v6.0" to enable $queue/ namespace and FETCH semantics.
+  string mqtt_ext_version = 1;
+
+  // Client's last successfully processed sequence number (high-watermark).
+  // Broker uses this to resume delivery from the correct position on reconnect.
+  uint32 last_received_sequence = 2;
+
+  // Client's current known epoch.
+  // If the broker's epoch is higher, it will signal an Epoch Reset in CONNACK.
+  uint32 client_epoch = 3;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECS/GEM over MQTT v6.0
+// Wraps a SECS-II message body with v6.0 stream metadata for semiconductor
+// manufacturing environments where message ordering is mandatory.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Import note: in real use, import "mqtt_v6.proto" for StreamMetadata.
+
+message SecsIIMessage {
+  // v6.0 stream metadata (sequence + epoch).
+  StreamMetadata v6_meta = 1;
+
+  // SECS-II Stream number (e.g., 1 for S1Fx, 2 for S2Fx).
+  uint32 stream = 2;
+
+  // SECS-II Function number (e.g., 13 for S1F13, 21 for S2F21).
+  uint32 function = 3;
+
+  // Reply bit: if true, the sender expects a reply message.
+  bool wait_bit = 4;
+
+  // The raw SECS-II / SML-formatted data payload.
+  // Encoding follows the SEMI E5 standard (SECS-II data items).
+  bytes sml_payload = 5;
+
+  // Unix timestamp (nanoseconds) when the transaction was initiated.
+  // Used for timeout tracking and audit logging in multi-broker failover.
+  uint64 transaction_start_time_ns = 6;
+
+  // Device ID of the target tool (maps to HSMS header's Device ID field).
+  uint32 device_id = 7;
+}
