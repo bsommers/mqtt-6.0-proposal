@@ -2,114 +2,99 @@
 
 ---
 
-## 1. HiveMQ Shared-Nothing Cluster: Queue Ownership
+## 1. Cluster Queue Ownership (C4)
 
 ```mermaid
-graph TD
-    subgraph Cluster["HiveMQ v6.0 Cluster (5 Nodes)"]
-        N1["Node 1<br/>Leader: $queue/line_1<br/>Leader: $queue/events_A"]
-        N2["Node 2<br/>Leader: $queue/line_2<br/>Leader: $queue/alarms"]
-        N3["Node 3<br/>Leader: $queue/line_3<br/>Leader: $queue/fdc_data"]
-        N4["Node 4<br/>Leader: $queue/line_4<br/>Leader: $queue/events_B"]
-        N5["Node 5<br/>Leader: $queue/line_5<br/>Leader: $queue/commands"]
-        RING["Consistent Hash Ring<br/>MD5($queue/name) mod N"]
-    end
+%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFD600','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','secondaryColor':'#424242','tertiaryColor':'#FFF9C4'}}}%%
+C4Context
+    title HiveMQ v6.0 — Cluster Queue Ownership
 
-    N1 <-.->|Replicate| N2
-    N2 <-.->|Replicate| N3
-    N3 <-.->|Replicate| N4
-    N4 <-.->|Replicate| N5
-    N5 <-.->|Replicate| N1
+    Person(pub, "Publisher")
+    Person(con, "Consumer")
 
-    RING -.->|Hash routing| N1
-    RING -.->|Hash routing| N3
-    RING -.->|Hash routing| N5
+    System_Boundary(cluster, "HiveMQ Cluster (consistent hash ring)") {
+        System(n1, "Node 1", "Leader: $queue/line_1, $queue/events_A")
+        System(n2, "Node 2", "Leader: $queue/line_2, $queue/alarms")
+        System(n3, "Node 3", "Leader: $queue/line_3, $queue/fdc_data")
+    }
 
-    PUB["Publisher"] -->|$queue/line_1| N1
-    CON["Consumer"] -->|FETCH $queue/fdc_data| N3
+    Rel(pub, n1, "PUBLISH $queue/line_1", "hash → Node 1")
+    Rel(con, n3, "FETCH $queue/fdc_data", "hash → Node 3")
+    Rel(n1, n2, "Replicate", "async")
+    Rel(n2, n3, "Replicate", "async")
+    Rel(n3, n1, "Replicate", "async")
+
+    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
 ```
 
 ---
 
-## 2. Leader Election State Machine
+## 2. Leader Node State Machine
 
 ```mermaid
+%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFD600','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121'}}}%%
 stateDiagram-v2
-    [*] --> Candidate: Node starts / leader lost
+    direction LR
+    [*] --> Candidate : start / leader lost
+    Candidate --> Leader : win election
+    Candidate --> Follower : another node wins
+    Leader --> EpochReset : continuity gap detected
+    EpochReset --> Leader : Epoch++ · notify clients
+    Leader --> [*] : node crash
+    Follower --> Candidate : heartbeat timeout
+    Follower --> Follower : receive replicated data
 
-    Candidate --> Leader: Win election<br/>(Raft / consistent hash)
-    Candidate --> Follower: Another node wins
-
-    Leader --> Leader: Normal operation<br/>Sequence incrementing
-
-    Leader --> Epoch_Reset: Cannot guarantee<br/>sequence continuity
-    Epoch_Reset --> Leader: Increment Epoch<br/>Notify all consumers
-
-    Leader --> Dead: Node crash / partition
-    Dead --> [*]
-
-    Follower --> Candidate: Leader heartbeat lost
-    Follower --> Follower: Receive replicated data
+    note right of EpochReset : Increment Epoch\nDisconnect consumers\nwith 0xA0
 ```
 
 ---
 
-## 3. Replication and Quorum Acknowledgement
+## 3. Quorum Replication
 
 ```mermaid
+%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFD600','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','actorBkg':'#FFD600','actorBorder':'#212121','actorTextColor':'#212121','noteBkgColor':'#FFF9C4','noteTextColor':'#212121','activationBkgColor':'#FFF9C4','signalColor':'#212121','signalTextColor':'#212121'}}}%%
 sequenceDiagram
     participant P as Publisher
-    participant L as Leader Node (Node 1)
-    participant R1 as Replica Node 2
-    participant R2 as Replica Node 3
+    participant L as Leader
+    participant R1 as Replica 1
+    participant R2 as Replica 2
 
-    P->>L: PUBLISH $queue/production<br/>Payload: sensor_batch_99
-
-    L->>L: Assign Seq=1099, Epoch=1<br/>Write to local NVMe
-
-    par Parallel Replication (Replication-Factor=2)
-        L->>R1: Replicate Seq=1099
+    P->>L: PUBLISH $queue/prod
+    L->>L: Seq=1099 Epoch=1 · NVMe write
+    par RF=2
+        L->>R1: Replicate 1099
         R1-->>L: ACK
     and
-        L->>R2: Replicate Seq=1099
+        L->>R2: Replicate 1099
         R2-->>L: ACK
     end
-
-    L-->>P: PUBACK Seq=1099
-    Note over P,L: Acknowledged only after<br/>2 replicas confirmed durability
-
-    Note over L: Node 1 crashes!
-
-    Note over R1: R1 wins election<br/>R1 has Seq=1099 ✓<br/>No Epoch Reset needed
-    R1->>R1: Become Leader<br/>Epoch=1 (unchanged)
+    L-->>P: PUBACK 1099
+    L-xR1: Node L crashes
+    Note over R1: R1 has 1099 ✓\nelected Leader · Epoch=1 unchanged
 ```
 
 ---
 
-## 4. Failure Scenarios and Outcomes
+## 4. Failover Decision Tree
 
 ```mermaid
+%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFD600','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','edgeLabelBackground':'#FFFFFF'}}}%%
 flowchart TD
-    FAIL["Node Failure Detected"] --> CHECK{"Does new leader have<br/>all replicated data?"}
+    FAIL["Node failure"] --> Q1{"New leader has\nall data?"}
 
-    CHECK -->|"Yes — clean failover"| CLEAN["Continue with same Epoch<br/>Seq continuity preserved<br/>Consumers resume normally"]
+    Q1 -->|Yes| OK["Same Epoch\nResume normally"]
+    Q1 -->|No| Q2{"Gap size?"}
 
-    CHECK -->|"No — replication lag"| LAG{"How much data lost?"}
+    Q2 -->|Small| WARN["Epoch++\nResume from\nlast confirmed Seq"]
+    Q2 -->|Large / partition| CRIT["Epoch++\nFull client resync\nfrom Seq=0"]
 
-    LAG -->|"Gap is small<br/>(within replication window)"| SMALL["Increment Epoch<br/>Resume from last confirmed Seq<br/>Alert consumers to reconcile"]
+    classDef ok fill:#FFD600,stroke:#212121,color:#212121
+    classDef warn fill:#9E9E9E,stroke:#212121,color:#212121
+    classDef crit fill:#212121,stroke:#FFD600,color:#FFD600
 
-    LAG -->|"Gap is large<br/>(node was partitioned)"| LARGE["Increment Epoch<br/>New Leader starts fresh Seq from 0<br/>Consumers must full-resync"]
-
-    CLEAN --> NOTIFY_NONE["No client action needed"]
-    SMALL --> NOTIFY_EPOCH["Send new Epoch in CONNACK<br/>Clients clear idempotency window"]
-    LARGE --> NOTIFY_FULL["Send new Epoch in CONNACK<br/>Clients perform S1F13-style reset"]
-
-    style CLEAN fill:#9f9,stroke:#333
-    style NOTIFY_NONE fill:#9f9,stroke:#333
-    style SMALL fill:#ff9,stroke:#333
-    style NOTIFY_EPOCH fill:#ff9,stroke:#333
-    style LARGE fill:#f99,stroke:#333
-    style NOTIFY_FULL fill:#f99,stroke:#333
+    class OK ok
+    class WARN warn
+    class CRIT crit
 ```
 
 ---
@@ -117,52 +102,55 @@ flowchart TD
 ## 5. Client Reconnect Decision Tree
 
 ```mermaid
+%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFD600','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','edgeLabelBackground':'#FFFFFF'}}}%%
 flowchart TD
-    RECONNECT["Client reconnects<br/>Sends: last-seq=N, epoch=E"] --> BROKER{"Broker checks<br/>queue state"}
+    RC["Client reconnects\nlast-seq=N epoch=E"] --> E{"Epoch\nmatches?"}
 
-    BROKER --> MATCH{"Epoch matches<br/>AND Seq N exists?"}
+    E -->|Yes| S{"Seq N\nexists?"}
+    E -->|No – changed| RESET["CONNACK new Epoch\nClient clears HWM\nFull resync"]
 
-    MATCH -->|"Yes"| RESUME["Resume delivery<br/>from Seq N+1<br/>No disruption"]
+    S -->|Yes| RESUME["Resume from N+1\nNo disruption"]
+    S -->|No – gap| GAP["Resume from\nearliest Seq\nFlag missing range"]
 
-    MATCH -->|"Epoch matches<br/>but Seq N missing"| GAP["Gap detected!<br/>Deliver from earliest available<br/>Flag missing range to client<br/>Same epoch"]
+    classDef ok fill:#FFD600,stroke:#212121,color:#212121
+    classDef warn fill:#9E9E9E,stroke:#212121,color:#212121
+    classDef crit fill:#212121,stroke:#FFD600,color:#FFD600
 
-    MATCH -->|"Epoch changed"| RESET["Send new Epoch in CONNACK<br/>Client clears idempotency state<br/>Client sends FETCH from Seq=0"]
-
-    RESET --> RESYNC["Full Resync<br/>Comparable to SECS/GEM S1F13"]
-
-    style RESUME fill:#9f9,stroke:#333
-    style GAP fill:#ff9,stroke:#333
-    style RESET fill:#f99,stroke:#333
-    style RESYNC fill:#f99,stroke:#333
+    class RESUME ok
+    class GAP warn
+    class RESET crit
 ```
 
 ---
 
-## 6. Tiered Storage Model for Persistent Queues
+## 6. Tiered Storage
 
 ```mermaid
+%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFD600','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','clusterBkg':'#FFF9C4'}}}%%
 graph LR
-    subgraph Broker["Broker Node"]
-        direction TB
-        RAM["Hot Tier<br/>(RAM Buffer)<br/>Last ~1,000 messages<br/>Sub-ms access"]
-        NVME["Warm Tier<br/>(NVMe SSD)<br/>Last ~1M messages<br/>~1ms access"]
+    subgraph Broker
+        HOT["HOT\nRAM / NVMe\n~1k msgs · sub-ms"]
+        WARM["WARM\nNVMe SSD\n~1M msgs · ~1ms"]
     end
+    COLD["COLD\nObject Store\nunlimited · ~100ms"]
 
-    subgraph Cold["Cold Tier (Object Storage)"]
-        S3["S3 / GCS / Azure Blob<br/>Unlimited retention<br/>~100ms access"]
-    end
+    PUB["Publisher"] -->|write| HOT
+    HOT -->|evict| WARM
+    WARM -->|evict| COLD
 
-    PUB["Publisher"] -->|"Write path"| RAM
-    RAM -->|"Evict old (async)"| NVME
-    NVME -->|"Evict old (async)"| S3
+    CON1["Consumer\n(recent)"] -->|FETCH| HOT
+    CON2["Consumer\n(backlog)"] -->|FETCH| WARM
+    AUD["Audit / Replay"] -->|read| COLD
 
-    CON["Consumer<br/>(FETCH recent)"] -->|"Hot read path"| RAM
-    CON2["Consumer<br/>(FETCH backlog)"] -->|"Warm read path"| NVME
-    AUDIT["Audit / Replay<br/>(deep history)"] -->|"Cold read path"| S3
+    classDef hot fill:#FFD600,stroke:#212121,color:#212121
+    classDef warm fill:#9E9E9E,stroke:#212121,color:#212121
+    classDef cold fill:#424242,stroke:#212121,color:#FFFFFF
+    classDef actor fill:#FFFFFF,stroke:#212121,color:#212121
 
-    style RAM fill:#9ff,stroke:#333
-    style NVME fill:#9f9,stroke:#333
-    style S3 fill:#ff9,stroke:#333
+    class HOT hot
+    class WARM warm
+    class COLD cold
+    class PUB,CON1,CON2,AUD actor
 ```
 
 ---
@@ -170,15 +158,15 @@ graph LR
 ## 7. Epoch Timeline
 
 ```mermaid
+%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFD600','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121'}}}%%
 timeline
-    title Queue Epoch History: $queue/production_line
+    title $queue/production_line · Epoch History
     section Epoch 1
-        Seq 1-5000 : Normal operation<br/>Node 1 is Leader
-        Seq 5001 : Node 1 crashes<br/>Replication lag: up to Seq 4998
+        Seq 1–5000  : Node 1 leader · normal operation
+        Seq 5001    : Node 1 crash · replication at Seq 4998
     section Epoch 2
-        Seq 0-2000 : Node 2 becomes Leader<br/>Epoch incremented to 2<br/>All clients resync
-        Seq 2001-8500 : Stable operation<br/>Node 2 is Leader
-        Seq 8500 : Planned maintenance<br/>Clean handoff to Node 3
-    section Epoch 3 (optional increment)
-        Seq 8501+ : Node 3 takes over<br/>Epoch may stay at 2<br/>(if clean handoff)
+        Seq 0–2000  : Node 2 elected · all clients resync
+        Seq 2001–8500 : Stable · Node 2 leader
+    section Epoch 2 (cont.)
+        Seq 8501+   : Node 3 clean handoff · Epoch unchanged
 ```
