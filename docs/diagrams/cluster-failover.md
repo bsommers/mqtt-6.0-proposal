@@ -7,7 +7,7 @@
 ## 1. Masterless Cluster — Any Node Sequences Any Publish (C4)
 
 ```mermaid
-%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFD600','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','secondaryColor':'#424242','tertiaryColor':'#FFF9C4'}}}%%
+%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFFFFF','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','secondaryColor':'#FFFFFF','tertiaryColor':'#FFFFFF'}}}%%
 C4Context
     title HiveMQ v6.0 — Masterless Cluster (all nodes are peers)
 
@@ -34,10 +34,10 @@ C4Context
 
 ---
 
-## 2. Sequence Assignment — Distributed Counter (No Leader Required)
+## 2. Sequence Assignment — Distributed Counter
 
 ```mermaid
-%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFD600','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','actorBkg':'#FFD600','actorBorder':'#212121','actorTextColor':'#212121','noteBkgColor':'#FFF9C4','noteTextColor':'#212121','activationBkgColor':'#FFF9C4','signalColor':'#212121','signalTextColor':'#212121'}}}%%
+%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFFFFF','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','actorBkg':'#FFFFFF','actorBorder':'#212121','actorTextColor':'#212121','noteBkgColor':'#FFD600','noteTextColor':'#212121','activationBkgColor':'#F5F5F5','signalColor':'#212121','signalTextColor':'#212121'}}}%%
 sequenceDiagram
     participant P as Publisher
     participant N as Any Node
@@ -53,15 +53,15 @@ sequenceDiagram
         R-->>N: ACK (quorum met)
     end
     N-->>P: PUBACK Seq=1001
-    Note over N,C: Any other node concurrently claiming\nwill get Seq=1002 — no conflict
+    Note over N,C: Concurrent publish on any node gets Seq=1002
 ```
 
 ---
 
-## 3. Node Crash — No Leader Election Required
+## 3. Node Crash — No Election Required
 
 ```mermaid
-%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFD600','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','actorBkg':'#FFD600','actorBorder':'#212121','actorTextColor':'#212121','noteBkgColor':'#FFF9C4','noteTextColor':'#212121','activationBkgColor':'#FFF9C4','signalColor':'#212121','signalTextColor':'#212121'}}}%%
+%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFFFFF','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','actorBkg':'#FFFFFF','actorBorder':'#212121','actorTextColor':'#212121','noteBkgColor':'#FFD600','noteTextColor':'#212121','activationBkgColor':'#F5F5F5','signalColor':'#212121','signalTextColor':'#212121'}}}%%
 sequenceDiagram
     participant P as Publisher
     participant A as Node A
@@ -73,7 +73,7 @@ sequenceDiagram
     A->>A: Persist Seq=1099 (quorum write to B)
     A-->>P: PUBACK 1099
     A-xC: Node A crashes
-    Note over B: Node A gone · B already has\nSeq=1099 (quorum write) ✓\nEpoch unchanged · no resync needed
+    Note over B: B already has Seq=1099 via quorum write<br/>Epoch unchanged — no resync needed
     P->>B: PUBLISH $queue/line (reconnects to B)
     B->>C: CAS → Seq=1100 claimed
     B-->>P: PUBACK 1100
@@ -84,7 +84,7 @@ sequenceDiagram
 ## 4. Partition Event — When Epoch Increments
 
 ```mermaid
-%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFD600','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','actorBkg':'#FFD600','actorBorder':'#212121','actorTextColor':'#212121','noteBkgColor':'#FFF9C4','noteTextColor':'#212121','activationBkgColor':'#FFF9C4','signalColor':'#212121','signalTextColor':'#212121'}}}%%
+%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFFFFF','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','actorBkg':'#FFFFFF','actorBorder':'#212121','actorTextColor':'#212121','noteBkgColor':'#FFD600','noteTextColor':'#212121','activationBkgColor':'#F5F5F5','signalColor':'#212121','signalTextColor':'#212121'}}}%%
 sequenceDiagram
     participant P as Publisher
     participant A as Node A (partitioned)
@@ -94,12 +94,12 @@ sequenceDiagram
     Note over A,B: Network partition splits cluster
     P->>A: PUBLISH (partition side)
     A->>A: Cannot reach quorum for CAS
-    A-->>P: PUBACK rejected (0x97 Quota Exceeded)
-    Note over A: A refuses to claim Seq\n— CAS requires quorum
+    A-->>P: PUBLISH rejected — 0x97 Quota Exceeded
+    Note over A: CAS refused — quorum unreachable
 
     Note over A,B: Partition heals
-    B->>C: Counter state verified — epoch intact
-    Note over B: If counter quorum was lost:\nEpoch++ · notify all consumers\n\nIf counter quorum survived:\nEpoch unchanged · no resync needed
+    B->>C: Counter state verified
+    Note over B: Quorum lost → Epoch++, notify consumers<br/>Quorum intact → Epoch unchanged
 ```
 
 ---
@@ -107,23 +107,21 @@ sequenceDiagram
 ## 5. Failure Outcomes Decision Tree
 
 ```mermaid
-%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFD600','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','edgeLabelBackground':'#FFFFFF'}}}%%
+%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFFFFF','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','edgeLabelBackground':'#FFFFFF'}}}%%
 flowchart TD
-    FAIL["Node crash or\npartition heals"] --> Q1{"Quorum write\ncompleted for\nall in-flight msgs?"}
+    FAIL["Node crash or<br/>partition heals"] --> Q1{"Quorum write<br/>completed for<br/>all in-flight msgs?"}
 
-    Q1 -->|Yes| OK["Same Epoch\nPeers have full data\nNo client action"]
-    Q1 -->|No — orphaned Seq| Q2{"Counter quorum\nsurvived?"}
+    Q1 -->|Yes| OK["Same Epoch<br/>Peers have full data<br/>No client action"]
+    Q1 -->|No — orphaned Seq| Q2{"Counter quorum<br/>survived?"}
 
-    Q2 -->|Yes| GAP["Gap in sequence range\nEpoch unchanged\nConsumers notified of\nmissing Seq range"]
-    Q2 -->|No — partition split counter| EPOCH["Epoch++\nBroadcast new Epoch\nClients full-resync"]
+    Q2 -->|Yes| GAP["Gap in sequence range<br/>Epoch unchanged<br/>Consumers notified of<br/>missing Seq range"]
+    Q2 -->|No — partition split counter| EPOCH["Epoch++<br/>Broadcast new Epoch<br/>Clients full-resync"]
 
-    classDef ok fill:#FFD600,stroke:#212121,color:#212121
-    classDef warn fill:#9E9E9E,stroke:#212121,color:#212121
-    classDef crit fill:#212121,stroke:#FFD600,color:#FFD600
+    classDef highlight fill:#FFD600,stroke:#212121,color:#212121
+    classDef critical fill:#212121,stroke:#212121,color:#FFFFFF
 
-    class OK ok
-    class GAP warn
-    class EPOCH crit
+    class OK highlight
+    class EPOCH critical
 ```
 
 ---
@@ -131,23 +129,21 @@ flowchart TD
 ## 6. Client Reconnect Decision Tree
 
 ```mermaid
-%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFD600','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','edgeLabelBackground':'#FFFFFF'}}}%%
+%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFFFFF','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','edgeLabelBackground':'#FFFFFF'}}}%%
 flowchart TD
-    RC["Client reconnects\nlast-seq=N epoch=E\n(to any peer node)"] --> E{"Epoch\nmatches?"}
+    RC["Client reconnects<br/>last-seq=N epoch=E<br/>(any peer node)"] --> E{"Epoch<br/>matches?"}
 
-    E -->|Yes| S{"Seq N in\ndata grid?"}
-    E -->|No – incremented| RESET["CONNACK new Epoch\nClient clears HWM\nFull resync from Seq=0"]
+    E -->|Yes| S{"Seq N in<br/>data grid?"}
+    E -->|No — incremented| RESET["CONNACK new Epoch<br/>Client clears HWM<br/>Full resync from Seq=0"]
 
-    S -->|Yes| RESUME["Resume from N+1\nNo disruption"]
-    S -->|No – orphaned Seq| GAP["Resume from earliest\nFlag gap range to client\nEpoch unchanged"]
+    S -->|Yes| RESUME["Resume from N+1<br/>No disruption"]
+    S -->|No — orphaned Seq| GAP["Resume from earliest<br/>Flag gap range to client<br/>Epoch unchanged"]
 
-    classDef ok fill:#FFD600,stroke:#212121,color:#212121
-    classDef warn fill:#9E9E9E,stroke:#212121,color:#212121
-    classDef crit fill:#212121,stroke:#FFD600,color:#FFD600
+    classDef highlight fill:#FFD600,stroke:#212121,color:#212121
+    classDef critical fill:#212121,stroke:#212121,color:#FFFFFF
 
-    class RESUME ok
-    class GAP warn
-    class RESET crit
+    class RESUME highlight
+    class RESET critical
 ```
 
 ---
@@ -155,31 +151,24 @@ flowchart TD
 ## 7. Tiered Storage
 
 ```mermaid
-%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFD600','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','clusterBkg':'#FFF9C4'}}}%%
+%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFFFFF','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','clusterBkg':'#F5F5F5'}}}%%
 graph LR
     subgraph Broker
-        HOT["HOT\nRAM / NVMe\n~1k msgs · sub-ms"]
-        WARM["WARM\nNVMe SSD\n~1M msgs · ~1ms"]
+        HOT["HOT<br/>RAM / NVMe<br/>~1k msgs · sub-ms"]
+        WARM["WARM<br/>NVMe SSD<br/>~1M msgs · ~1ms"]
     end
-    COLD["COLD\nObject Store\nunlimited · ~100ms"]
+    COLD["COLD<br/>Object Store<br/>unlimited · ~100ms"]
 
     PUB["Publisher"] -->|write| HOT
     HOT -->|evict| WARM
     WARM -->|evict| COLD
 
-    CON1["Consumer\n(recent)"] -->|FETCH| HOT
-    CON2["Consumer\n(backlog)"] -->|FETCH| WARM
+    CON1["Consumer<br/>(recent)"] -->|FETCH| HOT
+    CON2["Consumer<br/>(backlog)"] -->|FETCH| WARM
     AUD["Audit / Replay"] -->|read| COLD
 
-    classDef hot fill:#FFD600,stroke:#212121,color:#212121
-    classDef warm fill:#9E9E9E,stroke:#212121,color:#212121
-    classDef cold fill:#424242,stroke:#212121,color:#FFFFFF
-    classDef actor fill:#FFFFFF,stroke:#212121,color:#212121
-
-    class HOT hot
-    class WARM warm
-    class COLD cold
-    class PUB,CON1,CON2,AUD actor
+    classDef highlight fill:#FFD600,stroke:#212121,color:#212121
+    class HOT highlight
 ```
 
 ---
@@ -187,15 +176,14 @@ graph LR
 ## 8. Epoch Timeline
 
 ```mermaid
-%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFD600','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121'}}}%%
+%%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFFFFF','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121'}}}%%
 timeline
     title $queue/production_line · Epoch History
     section Epoch 1
         Seq 1–5000  : All nodes healthy · quorum writes succeed
-        Seq 5001    : Node A crashes · quorum on B+C → data intact
-    section Epoch 1 (cont.)
-        Seq 5001+   : B+C continue · Epoch unchanged (quorum survived)
-    section Epoch 2 (partition event)
-        Counter reset : Network partition split counter quorum\nSurviving side increments Epoch · clients resync
-        Seq 0+      : New epoch · all consumers reconcile
+        Node A crash : Quorum on B+C intact · data preserved · Epoch unchanged
+        Seq 5001+   : B and C continue without interruption
+    section Epoch 2
+        Partition event : Counter quorum lost · Epoch incremented to 2
+        Seq 0+      : All consumers resync to new epoch
 ```
