@@ -39,7 +39,7 @@ The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**, **
 | **SQMC** | Single-Queue Multi-Consumer — a queuing pattern where each message is delivered to exactly one of multiple active consumers |
 | **Virtual FETCH** | Compatibility-mode representation of FETCH using PUBLISH to `$SYS/queues/{name}/fetch` |
 | **High-Watermark** | The last sequence number successfully processed by a consumer client |
-| **Leader Node** | In a shared-nothing cluster, the node responsible for sequencing a given `$queue/` |
+| **Distributed Sequence Counter** | A cluster-wide atomic counter maintained in HiveMQ's replication data grid, one per `$queue/`; any node may increment it atomically to claim the next sequence number |
 | **Competing Consumer** | SQMC mode: messages distributed round-robin; each message delivered to exactly one consumer |
 | **Exclusive Consumer** | SQMC mode: one designated consumer receives all messages; others are hot standbys |
 
@@ -100,7 +100,7 @@ MQTT v6.0 introduces four new Property Identifiers in the reserved range (`0x30�
 
 - **Type:** Two Byte Integer (16-bit unsigned, big-endian)
 - **Packets:** PUBLISH, CONNACK, DISCONNECT
-- **Normative:** The Broker MUST include the current Epoch in CONNACK for resuming sessions. The Broker MUST increment the Epoch when it cannot guarantee sequence continuity after a cluster leader election. A Client that receives an Epoch value greater than its stored Epoch MUST discard its local idempotency table and perform a full application-layer resynchronization.
+- **Normative:** The Broker MUST include the current Epoch in CONNACK for resuming sessions. The Broker MUST increment the Epoch when it cannot guarantee sequence continuity after a cluster partition or replication quorum loss (see Section 4.3.2). HiveMQ does not use leader election; Epoch increments are driven by partition events, not node promotions. A Client that receives an Epoch value greater than its stored Epoch MUST discard its local idempotency table and perform a full application-layer resynchronization.
 - **Purpose:** Identifies the "era" of a queue's sequence space. Allows clients to distinguish between a sequence gap (a missed message) and a cluster reset (all previous sequence context is invalid).
 
 #### 2.2.3 Throughput Limit (0x41)
@@ -316,18 +316,23 @@ For deployments where clients or brokers do not support Protocol Level 6:
 
 ### 4.3 Cluster Consistency (Shared-Nothing Architecture)
 
-In a masterless shared-nothing cluster (e.g., HiveMQ), v6.0 defines normative behavior for maintaining queue integrity across nodes.
+HiveMQ is a **masterless, shared-nothing cluster**: all nodes are peers, there are no permanent leaders, and no consensus protocol (Raft/Paxos) is used. Any node can accept any publish from any client. v6.0 MUST preserve monotonic sequencing within this constraint using a **Distributed Sequence Counter** rather than a designated leader.
 
-#### 4.3.1 Leader Node Assignment
+#### 4.3.1 Distributed Sequence Counter
 
-- **Normative:** Each named queue (`$queue/{name}`) SHOULD be assigned a Leader Node via consistent hashing of the queue name.
-- All publish and deliver operations for a given queue MUST be routed through its Leader Node to guarantee sequence monotonicity.
-- The Broker MAY return a `Server Reference` property in CONNACK directing the Client to the Leader Node for a given queue.
+- **Normative:** Each `$queue/{name}` MUST maintain a single cluster-wide **Distributed Sequence Counter** stored in the Broker's replication data grid (e.g., HiveMQ's internal distributed data store).
+- When a node receives a PUBLISH to a `$queue/` topic, it MUST perform an **atomic increment** (compare-and-swap) on that queue's counter to claim the next sequence number before persisting the message.
+- No routing constraint is imposed on clients or publishers — **any node may sequence any publish**. Monotonicity is guaranteed by the atomic counter, not by sticky routing.
+- If the atomic increment cannot complete because the counter's replication quorum is unavailable (e.g., a network partition has split the cluster), the receiving node MUST reject the PUBLISH with Reason Code `0x97 (Quota Exceeded)` and the client MUST retry after reconnection.
+- The Broker MUST NOT assign a sequence number speculatively (i.e., without a confirmed atomic increment). Speculative assignment risks duplicate sequence numbers across nodes.
 
 #### 4.3.2 Epoch Management
 
-- **Normative:** When a Leader Node fails and its replacement cannot verify the continuity of the Stream Sequence (e.g., replication lag resulted in data loss), the new Leader MUST increment the Stream Epoch.
-- The new Epoch MUST be included in the next CONNACK, PUBLISH from that queue, or a DISCONNECT to any Client connected to that queue.
+- **Normative:** The Broker MUST increment the Stream Epoch when it cannot guarantee that the Distributed Sequence Counter's state survived intact. This occurs when:
+  - A network partition resolves and the counter's quorum was lost, leaving the post-partition state uncertain; OR
+  - One or more nodes that held the only replica of unacknowledged `$queue/` messages leave the cluster permanently.
+- The new Epoch MUST be propagated in the next CONNACK or PUBLISH to any Client subscribed to the affected queue, and in a DISCONNECT to Clients that had in-flight messages at the time of the partition.
+- Nodes rejoining after a partition MUST defer to the surviving cluster's Epoch value.
 
 #### 4.3.3 Client Failover and Resync
 
@@ -455,7 +460,7 @@ In SECS/GEM, S2F21 (Remote Start) is mission-critical. Loss of this command can 
 **With v6.0:**
 1. Host publishes S2F21 with `Sequence: 5001, Epoch: 1` to `$queue/secsgem/tool_001/S2F21`
 2. Broker Node A persists to non-volatile storage and assigns Seq 5001
-3. Node A crashes; Node B takes over as Leader
+3. Node A crashes; its replica is gone but the Distributed Sequence Counter and message data survive in other nodes' data grid replicas
 4. Tool reconnects with `v6-last-seq: 5000` in CONNECT
 5. Node B checks persistent queue: Seq 5001 exists and was never acknowledged
 6. Node B resumes delivery: tool receives S2F21 exactly once

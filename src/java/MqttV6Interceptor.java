@@ -37,13 +37,24 @@ public class MqttV6Interceptor implements PublishInboundInterceptor {
     private static final String FETCH_SUFFIX = "/fetch";
 
     // ── Per-queue sequence counters (keyed by queue name) ─────────────────────
-    // In production: replace with ClusterService-backed distributed counters.
-    private final ConcurrentHashMap<String, AtomicLong> queueSequences =
+    // HiveMQ is masterless — sequence numbers MUST come from a cluster-wide
+    // distributed atomic counter, NOT a per-node AtomicLong.
+    //
+    // In production, replace this map with HiveMQ's distributed data store
+    // entries (e.g., via ClusteringService or a distributed AtomicLong from
+    // the cluster data grid). Any node that receives a publish performs a
+    // compare-and-swap (CAS) on the counter to atomically claim the next Seq.
+    //
+    // The local AtomicLong below is used for single-node testing only.
+    // It MUST NOT be used in a multi-node deployment.
+    private final ConcurrentHashMap<String, AtomicLong> localOnlyQueueSequences =
             new ConcurrentHashMap<>();
 
     // ── Current cluster epoch ─────────────────────────────────────────────────
-    // Incremented by the ClusterEventListener when a node fails.
-    // In production: managed by ClusterService and propagated across nodes.
+    // Incremented when a network partition causes counter quorum loss.
+    // NOT incremented on ordinary node crashes (quorum write ensures surviving
+    // nodes have the data). In production, managed via ClusterService partition
+    // detection events — NOT by monitoring individual node failures.
     private volatile long currentEpoch = 1;
 
     // ── Queue-level maximum batch sizes for Virtual FETCH ─────────────────────
@@ -88,7 +99,10 @@ public class MqttV6Interceptor implements PublishInboundInterceptor {
             return;
         }
 
-        // Assign next sequence number for this queue
+        // Assign next sequence number via cluster-wide distributed CAS.
+        // In production: use a distributed atomic counter from HiveMQ's data
+        // grid so that any peer node claiming a Seq gets a globally unique value.
+        // The local counter below is for single-node testing only.
         final long nextSeq = getOrCreateSequence(queueName).incrementAndGet();
 
         // Inject v6.0 metadata as User Properties (Compatibility Mode)
@@ -172,15 +186,19 @@ public class MqttV6Interceptor implements PublishInboundInterceptor {
     // ── Epoch Management ─────────────────────────────────────────────────────
 
     /**
-     * Called by ClusterEventListener when a queue leader fails.
-     * Increments the epoch for all queues or a specific queue.
+     * Called when a network partition is detected and the distributed sequence
+     * counter's quorum cannot be verified on recovery.
      *
-     * In production, this would be wired to HiveMQ's ClusterService events.
+     * This is NOT triggered by ordinary node crashes — those are handled by
+     * quorum writes leaving intact data on surviving nodes. Epoch only
+     * increments when the counter's replication quorum itself was split.
+     *
+     * In production, wire this to HiveMQ's ClusterService partition events.
      */
-    public void onLeaderFailover(String failedQueueName) {
+    public void onCounterQuorumLost(String affectedQueueName) {
         currentEpoch++;
         System.out.printf("[EPOCH RESET] Queue: %s | New Epoch: %d%n",
-                failedQueueName, currentEpoch);
+                affectedQueueName, currentEpoch);
 
         // In production: notify all active consumers via DISCONNECT
         // with Reason Code 0xA0 (Epoch Reset) and the new epoch value.
@@ -190,7 +208,7 @@ public class MqttV6Interceptor implements PublishInboundInterceptor {
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private AtomicLong getOrCreateSequence(String queueName) {
-        return queueSequences.computeIfAbsent(queueName, k -> new AtomicLong(0));
+        return localOnlyQueueSequences.computeIfAbsent(queueName, k -> new AtomicLong(0));
     }
 
     /** Placeholder for fluent output manipulation (simplified for readability). */

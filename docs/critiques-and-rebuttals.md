@@ -61,20 +61,24 @@ Type 16 was reserved in v5.0 specifically to indicate an error. A v5.0 broker re
 
 ## Part 2: Software Engineering & Performance Critique
 
-### Criticism 4: "Leader Nodes create hot-key bottlenecks in HiveMQ clusters."
+### Criticism 4: "The original proposal's Leader Node model contradicts HiveMQ's masterless architecture."
 
-**From:** Distributed systems engineers
+**From:** HiveMQ engineers, distributed systems architects
 
 **The Argument:**
-Mapping each `$queue/` to a single Leader Node defeats the purpose of a shared-nothing cluster. If you have 1,000 consumers all reading from `$queue/production_line_1`, every read and write must go through one node. This is a single point of congestion — the opposite of horizontal scaling.
+The early draft proposed assigning a "Leader Node" per `$queue/` via consistent hashing, with all publishes routing through that node. HiveMQ is explicitly masterless — all nodes are peers, no consensus protocol (Raft/Paxos) is used, and no node "owns" a topic. The Leader Node model would require HiveMQ to fundamentally change its architecture.
 
-**Rebuttal:**
+**Resolution (accepted — the proposal was updated):**
 
-1. **Fine-grained partitioning distributes leadership.** Consistent hashing maps *different queue names* to different leader nodes. A fleet of 10,000 queues distributes evenly across the cluster. The "bottleneck" is per-queue, not per-cluster. If `$queue/production_line_1` is hot, split it: `$queue/production_line_1_A`, `$queue/production_line_1_B`.
+This criticism is **correct**. The Leader Node model was removed from the specification in favour of a **Distributed Sequence Counter** approach that is native to HiveMQ's actual architecture:
 
-2. **This is how Kafka partitions work.** Kafka's gold standard for ordering is: "one partition = one leader." MQTT v6.0 adopts the same proven model. The trade-off (ordering vs. unlimited parallel reads) is explicit and well-understood in the industry.
+1. **Distributed Sequence Counter.** Each `$queue/` maintains a single cluster-wide atomic counter in HiveMQ's replication data grid. Any node can increment it atomically (compare-and-swap) to claim the next sequence number. No routing changes are required; any node handles any publish. HiveMQ's existing data grid already provides the distributed primitives needed.
 
-3. **The alternative (leaderless) is worse.** Without leader assignment, two nodes might issue `Sequence 501` simultaneously during a network partition — "split-brain sequencing." The resulting data corruption is undetectable without human intervention. A hot-key bottleneck is a performance problem; split-brain is a correctness problem. Correctness wins.
+2. **No leader election, no Raft/Paxos.** The atomic counter replaces the entire leader/follower model. Split-brain sequencing (two nodes issuing the same Seq) is prevented by the CAS semantics of the counter, not by funneling all traffic through one node.
+
+3. **Epoch triggers change.** Instead of "leader failover triggers Epoch++", the trigger is "replication quorum loss" — i.e., when a network partition resolves and the counter's replicated state cannot be verified. This maps directly to HiveMQ's partition detection events, which the Extension SDK already exposes.
+
+4. **Hot-queue scaling still works.** If a single `$queue/` becomes a throughput bottleneck, the correct mitigation is application-level sharding (`$queue/line_1_A`, `$queue/line_1_B`) — exactly as you would shard a Kafka topic into multiple partitions. The counter CAS overhead per message is negligible compared to the NVMe write latency.
 
 ---
 
@@ -83,15 +87,17 @@ Mapping each `$queue/` to a single Leader Node defeats the purpose of a shared-n
 **From:** SREs, database engineers
 
 **The Argument:**
-Node A is the queue leader and is replicating Seq 100 to Node B. Node A crashes before replication completes. The client reconnects to Node B. Node B doesn't know about Seq 100. If the client sends Seq 101 next, there's a silent gap.
+Node A received a publish and incremented the sequence counter to Seq 100, but crashes before the message is replicated to other nodes. Node B has no record of Seq 100. A client that was tracking Seq 100 will detect a gap, but the message is unrecoverable.
 
 **Rebuttal:**
 
-1. **Quorum Acknowledgement (proposed improvement).** v6.0 can adopt a `Replication-Factor` property in SUBSCRIBE or at the queue level. A PUBACK is only sent to the publisher after `N` nodes have persisted the message (similar to Kafka's `acks=all` or `min.insync.replicas`). With `Replication-Factor: 2`, Node A crashing does not lose the message because Node B already has it.
+1. **Quorum write prevents the gap.** The spec requires the PUBACK to the publisher only after the message is confirmed on `N` replicas (configurable `Replication-Factor`). With `Replication-Factor: 2`, Node A crashing never loses the message because Node B already has it before the publisher received its PUBACK.
 
-2. **Epoch handles the unrecoverable case.** If replication lag *does* cause a gap (e.g., Replication-Factor = 1 by misconfiguration), the new Leader increments the Epoch. The client receives the new Epoch in CONNACK and knows to perform reconciliation. The gap is *visible* and *recoverable at the application layer* rather than silently corrupt.
+2. **The atomic counter and quorum write are decoupled.** The sequence number is claimed first (atomic CAS on the counter), then the message is written to quorum. If Node A crashes between those two steps, the claimed Seq number is "orphaned." This creates a one-time gap. The Epoch does NOT need to increment in this case — the surviving cluster knows the gap exists and can communicate it to consumers when they request that sequence range.
 
-3. **The v5.0 baseline is worse.** A v5.0 broker in the same failure scenario silently loses the message with no indication to the client or any mechanism for recovery. v6.0 makes the failure mode explicit and auditable.
+3. **Epoch for partition events only.** Epoch increments only when the entire counter quorum is lost (partition event) — not for individual node crashes. This reduces spurious full-resyncs that would otherwise be triggered by routine node restarts.
+
+4. **The v5.0 baseline is worse.** A v5.0 broker silently loses the message with no signal to the client. v6.0 makes the gap explicit, auditable, and recoverable at the application layer.
 
 ---
 
@@ -220,7 +226,7 @@ Properties `0x30`–`0x45` are currently unassigned in MQTT v5.0, but they could
 | Criticism / Pitfall | Severity | Probability | Mitigation Quality |
 |--------------------|----------|-------------|-------------------|
 | Type 16 breaks v5.0 brokers | High | High (mixed env) | ✅ Full (compat layer) |
-| Leader node hot spots | Medium | Medium | ✅ Good (partitioning) |
+| Leader node model (removed) | High | Resolved | ✅ Full (distributed counter) |
 | Replication lag / data loss | High | Low (with quorum) | ✅ Good (epoch + quorum) |
 | Storage bloat | Medium | Medium | ✅ Good (TTL + limits) |
 | Sequence wraparound (32-bit) | Low | Low (normal scale) | ✅ Good (epoch cycle) |

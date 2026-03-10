@@ -73,4 +73,4 @@ The **recommended path** is Native v6.0 with an optional Compatibility Layer for
 | **SQMC** | Single-Queue Multi-Consumer — strict load balancing with Competing or Exclusive semantics |
 | **Virtual FETCH** | Compatibility-mode equivalent of FETCH using `PUBLISH` to `$SYS/queues/{name}/fetch` |
 | **High-Watermark** | Client-side record of the last successfully processed sequence number |
-| **Leader Node** | In a HiveMQ cluster, the node responsible for a given `$queue/` via consistent hashing |
+| **Distributed Sequence Counter** | A cluster-wide atomic counter in HiveMQ's data grid, one per `$queue/`; any peer node increments it atomically to claim the next sequence number without routing constraints |

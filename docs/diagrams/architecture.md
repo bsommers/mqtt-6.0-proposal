@@ -41,7 +41,7 @@ C4Container
         Container(intercept, "Publish Interceptor", "Java / HiveMQ SDK", "Injects Seq (0x30) + Epoch (0x35)")
         Container(fetch, "FETCH Handler", "Java / HiveMQ SDK", "Releases message batches on request")
         Container(sqmc, "SQMC Engine", "Java / HiveMQ SDK", "Competing + Exclusive consumer logic")
-        Container(epoch, "Epoch Manager", "ClusterService", "Detects failover; increments Epoch")
+        Container(epoch, "Epoch Manager", "ClusterService", "Detects quorum loss / partition; increments Epoch")
     }
 
     Container_Boundary(stor, "Storage") {

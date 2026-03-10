@@ -25,22 +25,24 @@ sequenceDiagram
 
 ---
 
-## 2. Publish → Sequence Assignment
+## 2. Publish → Sequence Assignment (masterless)
 
 ```mermaid
 %%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFD600','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','actorBkg':'#FFD600','actorBorder':'#212121','actorTextColor':'#212121','noteBkgColor':'#FFF9C4','noteTextColor':'#212121','activationBkgColor':'#FFF9C4','signalColor':'#212121','signalTextColor':'#212121'}}}%%
 sequenceDiagram
     participant P as Publisher
-    participant L as Leader Node
-    participant R as Replica
+    participant N as Any Peer Node
+    participant C as Cluster Counter
+    participant R as Replica Nodes
 
-    P->>L: PUBLISH QoS=1 $queue/line payload
-    L->>L: Assign Seq=1001 Epoch=2 · persist to NVMe
+    P->>N: PUBLISH QoS=1 $queue/line payload
+    N->>C: CAS increment → Seq=1001 claimed (atomic)
+    N->>N: Persist Seq=1001 Epoch=2 to NVMe
     par quorum write
-        L->>R: Replicate Seq=1001
-        R-->>L: ACK
+        N->>R: Replicate Seq=1001
+        R-->>N: ACK
     end
-    L-->>P: PUBACK Seq=1001
+    N-->>P: PUBACK Seq=1001
 ```
 
 ---
@@ -156,15 +158,15 @@ sequenceDiagram
 %%{init:{'theme':'base','themeVariables':{'primaryColor':'#FFD600','primaryTextColor':'#212121','primaryBorderColor':'#212121','lineColor':'#212121','actorBkg':'#FFD600','actorBorder':'#212121','actorTextColor':'#212121','noteBkgColor':'#FFF9C4','noteTextColor':'#212121','activationBkgColor':'#FFF9C4','signalColor':'#212121','signalTextColor':'#212121'}}}%%
 sequenceDiagram
     participant C as Consumer
-    participant A as Node A
-    participant B as Node B
+    participant A as Node A (peer)
+    participant B as Node B (peer)
 
     C->>A: FETCH last-seq=5000 epoch=1
     A-->>C: PUBLISH Seq=5001 Epoch=1 · HWM=5001
-    A-xC: Node A crashes · replication lag to Seq=4998
+    A-xC: Partition — quorum for counter lost · B isolated
 
     C->>B: CONNECT last-seq=5001 epoch=1
-    B->>B: max replicated Seq=4998 < 5001 → EPOCH RESET
+    B->>B: Counter quorum lost during partition\nEpoch incremented to 2
     B-->>C: CONNACK Epoch=2
     Note over C: clear HWM · full resync
     C->>B: FETCH last-seq=0 epoch=2
