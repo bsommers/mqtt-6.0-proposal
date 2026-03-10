@@ -26,11 +26,16 @@
 9. [Alternative Approaches](alternatives.md)
 10. [Critical Perspectives & Rebuttals](critiques-and-rebuttals.md)
 11. [Technical Pitfalls & Mitigations](critiques-and-rebuttals.md#technical-pitfalls)
+12. [Performance Analysis: High-Volume & DEP Scale](performance-analysis.md)
+13. [Critical Analyses: Security, OT SRE, and Protocol Design](critical-analyses.md)
 
 ### Reference Implementations
-12. [Python v6.0 Shim (`gmqtt`)](../src/python/mqtt_v6_shim.py)
-13. [Protobuf Schema](../src/proto/mqtt_v6.proto)
-14. [HiveMQ Java Extension](../src/java/MqttV6Interceptor.java)
+14. [Python v6.0 Shim (`gmqtt`)](../src/python/mqtt_v6_shim.py)
+15. [Protobuf Schema](../src/proto/mqtt_v6.proto)
+16. [HiveMQ Java Extension](../src/java/MqttV6Interceptor.java)
+
+### Consolidated Reference
+17. [Full Proposal PDF (all sections + rendered diagrams)](mqtt-v6.0-proposal.pdf)
 
 ---
 
