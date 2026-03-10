@@ -4,9 +4,27 @@
 
 ---
 
+## 0. Important Context: What This Proposal Is Not
+
+**This is not "MQTT trying to become Kafka."** This is not a general-purpose upgrade. Most MQTT deployments do not need v6.0 and should remain on v5.0.
+
+This proposal targets a specific problem: **industrial operators who already use MQTT at the edge but are forced to bolt on Kafka, AMQP, or Redis at the broker tier** to get durable queuing and ordered delivery. The edge devices cannot change — they run constrained firmware with MQTT baked in. The bridge architecture (MQTT → Kafka → Consumer) adds operational cost, a second failure domain, and a second protocol stack. v6.0 eliminates the bridge by extending the MQTT broker with the specific queuing primitives these operators need, without changing the edge protocol.
+
+Every feature in v6.0 is already being implemented at the application layer by industrial MQTT users — sequence numbers in payloads, idempotency tables in databases, consumer group coordination in custom code. [Eclipse Sparkplug B](https://sparkplug.eclipse.org/specification/) is the most prominent example: it defines [application-layer sequencing on top of MQTT](https://sparkplug.eclipse.org/specification/version/2.2/documents/sparkplug-specification-2.2.pdf) precisely because MQTT v5.0 does not provide these primitives natively. v6.0 proposes to move these proven patterns from the payload into the protocol where brokers can optimize for them and client libraries can handle them automatically.
+
+For a detailed response to specific criticisms (including "this is Kafka," "v5.0 already does shared subscriptions," and "this should be application-level"), see [Addressing Criticisms — Point-by-Point Rebuttals](rebuttals.md).
+
+---
+
 ## 1. Who This Is For
 
 MQTT v6.0 is targeted at a specific tier of industrial and enterprise IoT deployments that have **outgrown what MQTT v5.0 was designed to provide**. It is not a general-purpose upgrade for all MQTT users.
+
+### Primary Use Cases
+
+**Semiconductor Manufacturing ([SECS/GEM](https://en.wikipedia.org/wiki/SECS/GEM)):** Semiconductor fabs run the [SEMI E30 (GEM)](https://store-us.semi.org/products/e03000-semi-e30-specification-for-the-generic-model-for-communications-and-control-of-manufacturing-equipment-gem) protocol for equipment communication. A lost `S2F21` (Remote Process Start) command can ruin a wafer worth $10K–$50K. Today, fabs using MQTT must embed sequence numbers and idempotency keys in application payloads because MQTT v5.0 has no protocol-level mechanism to detect a gap caused by a broker restart. Every equipment vendor implements this differently.
+
+**Energy and Grid SCADA ([IEC 61850](https://en.wikipedia.org/wiki/IEC_61850)):** Distributed energy providers operate millions of smart meters, PMUs, RTUs, and substation gateways. MQTT is increasingly used as the [edge transport for IEC 61850 telemetry](https://www.emqx.com/en/blog/iec-61850-protocol), but downstream data pipelines require ordered, durable queues with 90-day regulatory retention. Today this means an MQTT-to-Kafka bridge — a second system, a second failure domain, a second team.
 
 ### Primary Audience
 
@@ -87,10 +105,10 @@ This is the most frequently raised objection. The answer depends on **where in t
 ### At the Edge (Sensors, RTUs, PLCs, Smart Meters)
 
 Kafka and AMQP are not viable at the edge:
-- Kafka's minimum client footprint is ~10 MB — not compatible with microcontrollers
-- AMQP 1.0 is a complex framing protocol — correct implementation requires significant expertise and is poorly suited to constrained devices
+- Kafka's minimum client footprint requires a [full JVM stack with multi-GB RAM](https://docs.confluent.io/platform/current/installation/system-requirements.html) — not compatible with microcontrollers or constrained devices
+- [AMQP 1.0 is a complex framing protocol](https://www.hivemq.com/blog/mqtt-vs-amqp-for-iot/) — correct implementation requires significant expertise and is poorly suited to constrained devices
 - Kafka requires TCP connections with persistent state; many OT networks have unreliable connectivity and require disconnect-tolerant protocols
-- MQTT v5.0 is already deployed on hundreds of millions of devices with battle-tested client libraries for C, MicroPython, Java, and Go
+- MQTT v5.0 is already deployed on [hundreds of millions of devices](https://www.hivemq.com/blog/building-industrial-iot-data-streaming-architecture-mqtt/) with battle-tested client libraries for C, MicroPython, Java, and Go
 
 **Conclusion:** At the edge, MQTT remains the right protocol. The question is what happens to messages *after* they reach the broker cluster.
 

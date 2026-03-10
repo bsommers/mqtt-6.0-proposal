@@ -25,10 +25,11 @@
 
 ### Analysis
 9. [Alternative Approaches](alternatives.md)
-10. [Critical Perspectives & Rebuttals](critiques-and-rebuttals.md)
-11. [Technical Pitfalls & Mitigations](critiques-and-rebuttals.md#technical-pitfalls)
-12. [Performance Analysis: High-Volume & DEP Scale](performance-analysis.md)
-13. [Critical Analyses: Security, OT SRE, and Protocol Design](critical-analyses.md)
+10. [Addressing Criticisms — Point-by-Point Rebuttals](rebuttals.md)
+11. [Critical Perspectives & Rebuttals](critiques-and-rebuttals.md)
+12. [Technical Pitfalls & Mitigations](critiques-and-rebuttals.md#technical-pitfalls)
+13. [Performance Analysis: High-Volume & DEP Scale](performance-analysis.md)
+14. [Critical Analyses: Security, OT SRE, and Protocol Design](critical-analyses.md)
 
 ### Reference Implementations
 14. [Python v6.0 Shim (`gmqtt`)](../src/python/mqtt_v6_shim.py)

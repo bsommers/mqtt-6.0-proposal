@@ -1,6 +1,8 @@
 # Critical Analyses of MQTT v6.0
 
 > Three independent perspectives critiquing the MQTT v6.0 proposal.
+>
+> **See also:** [Addressing Criticisms — Point-by-Point Rebuttals](rebuttals.md) for responses to specific feedback from HiveMQ internal reviewers, including why `$share/` is not a durable queue, why `Receive Maximum` is not pull-based flow control, and the case for protocol-level vs. application-level reliability primitives.
 
 ---
 

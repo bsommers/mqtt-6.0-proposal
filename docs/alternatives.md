@@ -134,7 +134,7 @@ Kafka provides everything v6.0 proposes, but:
 ## 6. Alternative E: Extend MQTT Shared Subscriptions (v5.0 `$share/`)
 
 ### Description
-Enhance the existing MQTT v5.0 `$share/group/topic` mechanism to add message locking, exclusive consumer semantics, and failover logic — without changing the core protocol.
+Enhance the existing MQTT v5.0 [`$share/group/topic`](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901250) mechanism to add message locking, exclusive consumer semantics, and failover logic — without changing the core protocol.
 
 ### Pros
 - Uses an existing, widely-supported mechanism
@@ -142,10 +142,26 @@ Enhance the existing MQTT v5.0 `$share/group/topic` mechanism to add message loc
 - Implementable today as a broker plugin
 
 ### Cons
-- `$share/` groups are still session-dependent — the queue vanishes when the last client disconnects
-- No way to add explicit sequencing or gap detection within the `$share/` spec
+- `$share/` groups are still session-dependent — the queue vanishes when the last client disconnects. [Shared subscriptions distribute messages to active subscribers](https://www.hivemq.com/blog/mqtt5-essentials-part7-shared-subscriptions/); they do not buffer messages when no subscriber is connected.
+- No way to add explicit sequencing or gap detection within the `$share/` spec — there is no per-message identity that survives across sessions
 - No standardized way to express "exclusive" (hot-standby) mode in the subscription syntax
+- Consumer failover behavior (what happens when a consumer disconnects mid-processing) is [implementation-defined, not standardized](https://www.hivemq.com/docs/hivemq/4.13/user-guide/shared-subscriptions.html)
 - Extending `$share/` syntax creates a non-standard variation that other broker implementations won't support
+- Message ordering within a shared subscription group is not guaranteed by the spec
+
+### Why `$share/` Is Not a Durable Queue
+
+This is the most common misconception. `$share/` and `$queue/` solve fundamentally different problems:
+
+| Property | `$share/` (v5.0) | `$queue/` (v6.0) |
+|----------|:-:|:-:|
+| Survives all consumers disconnecting | No | Yes |
+| Survives broker restart (spec-mandated) | No | Yes |
+| Message ordering guarantee | No | Yes |
+| Gap detection | Impossible | Built-in |
+| Named, inspectable entity | No | Yes |
+
+A shared subscription is a **delivery optimization for active subscribers**. A named queue is a **persistent message store**. See [Addressing Criticisms](rebuttals.md#section-21-thats-a-shared-subscription) for full analysis.
 
 ### Verdict
 **Partially adopted.** The conceptual model of consumer groups and competing delivery from `$share/` inspired the SQMC design. But v6.0 requires named queue persistence and sequencing that `$share/` fundamentally cannot provide without a new namespace.

@@ -2,13 +2,17 @@
 
 ## What Is This?
 
-**MQTT v6.0** is a proposed evolutionary extension to the MQTT v5.0 protocol that upgrades it from a lightweight pub/sub message bus into an **industrial-grade stream messaging system**. It is designed to meet the reliability, ordering, and flow-control requirements of mission-critical environments — particularly semiconductor manufacturing (SECS/GEM), industrial IoT, and large-scale HiveMQ cluster deployments.
+**MQTT v6.0** is a proposed evolutionary extension to the MQTT v5.0 protocol that adds **targeted industrial queuing primitives** to the broker tier — without changing the edge protocol that millions of devices already run.
+
+It is **not** a general-purpose upgrade. It is **not** "MQTT trying to become Kafka." It targets a specific tier of deployment: **semiconductor manufacturing ([SECS/GEM](https://en.wikipedia.org/wiki/SECS/GEM)), energy grid SCADA ([IEC 61850](https://en.wikipedia.org/wiki/IEC_61850)), and large-scale industrial IoT** — environments where MQTT v5.0 is already deployed at the edge but operators are forced to bolt on Kafka or AMQP at the broker tier to get durable queuing, ordered delivery, and consumer group semantics. v6.0 eliminates that bridge.
+
+For a detailed response to criticisms including "v5.0 already does this" and "this should be application-level," see [Addressing Criticisms](rebuttals.md).
 
 ---
 
 ## The Problem
 
-MQTT v5.0 is excellent for lightweight telemetry and command delivery. However, it has structural limitations that force enterprise users to embed reliability logic inside application payloads:
+MQTT v5.0 is excellent for lightweight telemetry and command delivery. However, it has structural limitations that force enterprise users to embed reliability logic inside application payloads — a pattern already codified by [Eclipse Sparkplug B](https://sparkplug.eclipse.org/specification/) with its application-layer sequence numbers, and replicated ad-hoc by every industrial MQTT deployment that needs message ordering guarantees:
 
 - **No global message ordering.** The 16-bit Packet Identifier is per-session, transient, and recycled — making it impossible for a consumer to detect gaps caused by broker restarts or cluster failovers.
 - **Push-only delivery.** The broker pushes all messages to consumers as fast as they arrive. A slow consumer cannot apply backpressure without complex out-of-band coordination.
