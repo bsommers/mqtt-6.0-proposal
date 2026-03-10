@@ -1,7 +1,7 @@
 # MQTT Version 6.0 — Industrial Stream & Advanced Queuing Extension
 
 > **Status:** Draft Proposal — Based on exploratory design session, March 2026
-> **Authors:** HiveMQ / MQTT Community
+> **Author:** Bill Sommers, AI Solutions Lead, HiveMQ, Inc.
 > **Base Specification:** [MQTT v5.0 OASIS Standard](https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html)
 
 ---
@@ -10,7 +10,8 @@
 
 ### Overview
 1. [Executive Summary](executive-summary.md)
-2. [Design Goals & Motivation](#design-goals)
+2. [Motivation, Rationale & Intended Audience](motivation.md)
+3. [Design Goals & Motivation](#design-goals)
 
 ### Specification
 3. [MQTT v6.0 Full Specification](spec/mqtt-v6.0-spec.md)

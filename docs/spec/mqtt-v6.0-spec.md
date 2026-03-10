@@ -3,6 +3,7 @@
 
 **OASIS Standard Draft**
 **Date:** March 2026
+**Author:** Bill Sommers, AI Solutions Lead, HiveMQ, Inc.
 **Base Specification:** MQTT Version 5.0 OASIS Standard (https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html)
 
 ---
