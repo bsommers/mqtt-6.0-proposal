@@ -38,8 +38,12 @@ All v6.0 features encoded entirely as `User Properties` within existing v5.0 pac
 - **No protocol-level enforcement.** A broker cannot distinguish a v6.0 sequence-aware publish from a regular publish at the binary level without inspecting all user properties.
 - **No `FETCH` semantics at the broker level.** The broker cannot natively throttle push delivery; it requires application-level hacks.
 
+### The Fragmentation Risk
+
+Shipping these features as vendor-specific User Property conventions (without standardization) creates the exact problem standardization prevents. If HiveMQ uses `v6-seq`, EMQX uses `x-seq-number`, and AWS IoT Core uses `aws-sequence`, every customer running multiple brokers needs a translation layer. This is how `$SYS/` became fragmented across brokers — every vendor implemented it differently, and 15 years later there is still no standard. Standardizing the wire representation early prevents this.
+
 ### Verdict
-**Viable as a transitional shim.** Adopted as the Compatibility Layer (Track B). Not suitable as the long-term specification.
+**Viable as a transitional shim.** Adopted as the Compatibility Layer (Track B). Not suitable as the long-term specification because it prevents standardization and invites vendor fragmentation.
 
 ---
 

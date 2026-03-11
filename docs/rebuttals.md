@@ -17,6 +17,25 @@ The common thread: **every one of these customers has built the same set of appl
 
 I am not proposing that MQTT become Kafka. I am not proposing a general-purpose upgrade. I am proposing that we acknowledge what our customers are already building on top of MQTT and give them proper protocol-level tools instead of forcing them to reinvent the same workarounds in every deployment.
 
+### Why Standardize Now — Not "Ship an Extension First"
+
+The most reasonable pushback I have heard is: *"Ship these features as a HiveMQ extension. Let the market validate them. Come back to OASIS in five years with production data."*
+
+This sounds prudent, but it leads to **fragmentation, not validation.** If HiveMQ ships `$queue/`, FETCH, and SQMC as a proprietary extension, here is what happens next:
+
+- **EMQX builds their own version** — similar semantics, different User Property names, different control topic paths, different consumer group behavior
+- **Mosquitto community builds a plugin** — subset of features, incompatible wire format
+- **AWS IoT Core adds "durable queues"** — completely proprietary, no interop with any of the above
+- **Every customer running two brokers** (common in industrial — edge broker + cloud broker) now needs a translation layer between competing proprietary implementations
+
+This is exactly what happened with `$SYS/` — every broker implemented it differently, there is no standard, and it remains a mess 15 years later. It is what happened with shared subscription behavior before v5.0 partially standardized it — and even now the spec leaves enough implementation-defined gaps that HiveMQ had to build [Declared Shared Subscriptions](https://docs.hivemq.com/hivemq/latest/user-guide/declared-shared-subscriptions.html) as a proprietary workaround.
+
+**The extension-first path does not lead to standardization — it leads to vendor lock-in dressed up as innovation.** Once three vendors have incompatible implementations in production with paying customers depending on them, the OASIS committee has to reconcile three designs instead of evaluating one proposal. That is how standards processes stall for years.
+
+The patterns are already validated. Sparkplug proves application-layer sequencing works. HiveMQ's Declared Shared Subscriptions prove durable queue semantics are needed. Every customer I have worked with who runs an MQTT-to-Kafka bridge proves pull-based consumption is needed. What is missing is not proof of concept — it is a **standard wire representation** that lets a Paho client library work with a HiveMQ broker, an EMQX broker, or any future broker without vendor-specific payload conventions.
+
+**Standardizing early — before fragmentation — is cheaper than standardizing late.**
+
 ---
 
 ## What This Proposal Is Not
@@ -229,6 +248,10 @@ When sequence numbers are in the payload, the broker is a dumb pipe. It cannot d
 
 [Eclipse Sparkplug B](https://sparkplug.eclipse.org/specification/) already defines application-layer sequencing on MQTT. It proves the need is real and the industry has converged on a common pattern. v6.0 proposes to move that pattern from the payload into the protocol — exactly as MQTT v5.0 moved message expiry, request/response correlation, and shared subscriptions from application-layer conventions into protocol properties.
 
+**5. The extension-first path leads to fragmentation, not validation.**
+
+If we tell customers "build it in your application" or "use a vendor extension," every vendor and every customer builds their own version. We end up with a dozen incompatible implementations of the same five patterns. Standardizing at the protocol level — before fragmentation — gives the ecosystem a single wire representation that every client library and every broker can implement. This is the same argument I made above in [Why Standardize Now](#why-standardize-now--not-ship-an-extension-first): the `$SYS/` fragmentation and HiveMQ's proprietary Declared Shared Subscriptions are proof that the extension-first path does not converge on interoperability.
+
 ### The Historical Precedent
 
 MQTT v3.1.1 had no concept of message expiry, request/response correlation, or shared subscriptions. All were implementable at the application layer. MQTT v5.0 moved them into the protocol because the industry had converged on common patterns that benefited from standardization. The same trajectory applies here.
@@ -284,6 +307,7 @@ The genesis for this thinking is 2.5 years of watching our customers solve these
 | "Protocol doesn't concern itself with broker nodes" | Agreed — and the Epoch doesn't either. It defines client-facing behavior: "if sequence continuity cannot be guaranteed, tell the client." How the broker determines this internally is implementation-defined. |
 | "This should be application-level" | Every customer I have worked with has built these primitives in application code. None of their implementations are compatible. The broker cannot optimize what it cannot see. Sparkplug already proves the need. v6.0 standardizes the pattern. |
 | "Why not Kafka?" | Edge devices cannot run Kafka clients. The bridge adds cost and failure domains. v6.0 eliminates the bridge without changing edge devices. |
+| "Ship it as an extension first" | The extension-first path leads to fragmentation, not validation. If HiveMQ ships it proprietary, EMQX and AWS build incompatible versions. Standardizing early — before fragmentation — is cheaper than standardizing late. `$SYS/` and Declared Shared Subscriptions are proof. |
 | "Too much HOW, not enough WHY" | Fair. This document provides the WHY. The genesis is 2.5 years of TAM work watching customers solve these problems in application code. |
 
 ---

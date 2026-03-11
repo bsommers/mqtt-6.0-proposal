@@ -12,6 +12,8 @@ This proposal targets a specific problem: **industrial operators who already use
 
 Every feature in v6.0 is already being implemented at the application layer by industrial MQTT users — sequence numbers in payloads, idempotency tables in databases, consumer group coordination in custom code. [Eclipse Sparkplug B](https://sparkplug.eclipse.org/specification/) is the most prominent example: it defines [application-layer sequencing on top of MQTT](https://sparkplug.eclipse.org/specification/version/2.2/documents/sparkplug-specification-2.2.pdf) precisely because MQTT v5.0 does not provide these primitives natively. v6.0 proposes to move these proven patterns from the payload into the protocol where brokers can optimize for them and client libraries can handle them automatically.
 
+**Why not ship these as vendor extensions first?** Because the extension-first path leads to fragmentation, not standardization. If HiveMQ ships `$queue/` as a proprietary extension, EMQX, Mosquitto, and AWS IoT Core will build incompatible versions — just as every broker implemented `$SYS/` differently, creating a mess that remains unstandardized 15 years later. HiveMQ's own [Declared Shared Subscriptions](https://docs.hivemq.com/hivemq/latest/user-guide/declared-shared-subscriptions.html) — a proprietary workaround for the durable queue gap in `$share/` — is proof that extension-driven solutions do not converge on interoperability. Standardizing early, before fragmentation, is cheaper than standardizing late.
+
 For a detailed response to specific criticisms (including "this is Kafka," "v5.0 already does shared subscriptions," and "this should be application-level"), see [Addressing Criticisms — Point-by-Point Rebuttals](rebuttals.md).
 
 ---

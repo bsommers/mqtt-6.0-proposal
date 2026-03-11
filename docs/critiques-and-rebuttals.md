@@ -21,6 +21,8 @@ MQTT succeeded precisely because it fits in 128KB of RAM and works on a microcon
 
 3. **Scope Comparison:** The jump from v5.0 to v6.0 is smaller than the jump from v3.1.1 to v5.0. The v5.0 spec added Properties, Reason Codes, Shared Subscriptions, User Properties, and Will Delay — all of which "bloated" the protocol by the same argument. The ecosystem absorbed it; industrial users demanded it.
 
+4. **Standardize Early or Fragment Forever.** The alternative — "ship it as a vendor extension first" — sounds prudent but leads to fragmentation. If HiveMQ ships `$queue/` as a proprietary extension, EMQX, Mosquitto, and AWS IoT Core will build incompatible versions. `$SYS/` is the cautionary tale: every broker implemented it differently, and it remains unstandardized 15 years later. HiveMQ's own [Declared Shared Subscriptions](https://docs.hivemq.com/hivemq/latest/user-guide/declared-shared-subscriptions.html) are proof that extension-driven solutions do not converge on interoperability. Once three vendors have paying customers on incompatible implementations, the OASIS committee must reconcile three designs instead of evaluating one proposal — and standards processes stall for years. Standardizing before fragmentation is cheaper than standardizing after.
+
 ---
 
 ### Criticism 2: "The `$queue/` namespace breaks topic hierarchy semantics."

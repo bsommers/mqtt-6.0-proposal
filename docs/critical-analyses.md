@@ -286,6 +286,10 @@ I am not arguing that HiveMQ should not build these features. I am arguing that 
 
 MQTT became the dominant IoT protocol because it was simple, stable, and widely implemented. Those properties are worth more than any individual feature. The right way to honour that legacy is not to add features — it is to build the features where they belong, at the system layer, and let MQTT remain what it has always been: a lightweight, reliable, interoperable publish-subscribe transport.
 
+> **Author's response:** This is the most reasonable objection to the proposal, and it deserves a direct answer. The extension-first path sounds prudent, but it leads to **fragmentation, not validation.** If HiveMQ ships `$queue/` as a proprietary extension, EMQX, Mosquitto, and AWS IoT Core will each build incompatible versions — similar semantics, different wire formats, different User Property names, different consumer group behavior. This is exactly what happened with `$SYS/`: every broker implemented it differently, and it remains unstandardized 15 years later. HiveMQ's own [Declared Shared Subscriptions](https://docs.hivemq.com/hivemq/latest/user-guide/declared-shared-subscriptions.html) — built because `$share/` lacks durable queue semantics — are proof that extension-driven solutions do not converge on interoperability without a standard to converge on.
+>
+> The patterns themselves are already validated. [Sparkplug](https://sparkplug.eclipse.org/specification/) proves application-layer sequencing works. Declared Shared Subscriptions prove durable queue semantics are needed. Every MQTT-to-Kafka bridge in production proves pull-based consumption is needed. What is missing is not proof of concept — it is a standard wire representation. Standardizing early, before vendors fragment, is cheaper than reconciling three incompatible implementations at OASIS five years from now. See [Addressing Criticisms — Why Standardize Now](rebuttals.md#why-standardize-now--not-ship-an-extension-first) for the full argument.
+
 ---
 
 ## Summary Comparison
