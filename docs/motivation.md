@@ -70,6 +70,22 @@ MQTT v5.0 uses a 16-bit Packet Identifier that resets per session. Messages acro
 
 **The result:** Exactly-once processing at the application layer requires every publisher and consumer pair to implement bespoke deduplication logic. In a system with 50 publishers and 20 consumers, this is 1,000 pairwise agreements — none of them standardised.
 
+**What "1,000 pairwise agreements" means in practice:**
+
+When sequence numbers live in the payload rather than the protocol, every publisher and every consumer must agree on the payload format — and that agreement must happen pair by pair. Consider a semiconductor fab with 50 tools (publishers) sending messages to 20 downstream systems (consumers) — historians, MES, FDC analyzers, dashboards:
+
+- Tool A sends `{"seq": 123, "data": ...}` (JSON, field name `seq`)
+- Tool B sends a [Sparkplug](https://sparkplug.eclipse.org/specification/) protobuf with a `sequence_number` field
+- Tool C uses a custom binary header with bytes 0–3 as a big-endian sequence counter
+
+Every consumer that wants to do deduplication or gap detection on messages from Tool A needs to know Tool A's format. And Tool B's format. And Tool C's format. Each publisher-consumer pair is a "pairwise agreement" about how to find the sequence number in the payload.
+
+50 publishers × 20 consumers = 1,000 pairs that each need to agree on a schema. In practice, teams reduce this by picking a common format — but that common format is itself non-standard. It is a company-internal convention, not a protocol guarantee. Different companies, different vendors, and different integrations all pick different conventions. The result is that interoperability between organizations requires yet another translation layer.
+
+**The v6.0 fix:** The broker assigns the sequence number as a protocol property (`0x30`). Every publisher's message gets a sequence number automatically — the publisher does not even need to be aware of it. Every consumer reads it from the same property, regardless of payload format. The 1,000 pairwise agreements collapse to zero. The protocol is the agreement.
+
+Put simply: **when reliability metadata is in the payload, everyone has to agree on the payload format. When it is in the protocol, the protocol is the agreement.**
+
 ### 2.3 No Pull-Based Flow Control
 
 MQTT v5.0 is push-only. The broker delivers messages to subscribers as fast as they arrive. Consumer-side flow control is limited to:
