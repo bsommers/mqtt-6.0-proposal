@@ -66,6 +66,10 @@ MQTT v5.0 sessions are bound to a client identifier and a broker node. When a cl
 
 ### 2.2 No Message Ordering Guarantee Across Sessions
 
+MQTT v5.0 includes a Packet Identifier, but it is not a message sequence number. It exists only for QoS delivery handshakes, is scoped to a single client session, is reused after acknowledgement, and resets when the session reconnects. It therefore cannot be used to determine message ordering or detect gaps across sessions.
+
+MQTT v6.0 introduces a broker-assigned, monotonic sequence number (Property `0x30`) that identifies the message itself rather than the delivery attempt.
+
 MQTT v5.0 uses a 16-bit Packet Identifier that resets per session. Messages across sessions cannot be ordered. If a consumer reconnects mid-stream, it cannot determine which messages it has already processed and which it has not — not without an application-layer sequence number that the publisher must attach manually.
 
 **The result:** Exactly-once processing at the application layer requires every publisher and consumer pair to implement bespoke deduplication logic. In a system with 50 publishers and 20 consumers, this is 1,000 pairwise agreements — none of them standardised.
@@ -85,6 +89,41 @@ Every consumer that wants to do deduplication or gap detection on messages from 
 **The v6.0 fix:** The broker assigns the sequence number as a protocol property (`0x30`). Every publisher's message gets a sequence number automatically — the publisher does not even need to be aware of it. Every consumer reads it from the same property, regardless of payload format. The 1,000 pairwise agreements collapse to zero. The protocol is the agreement.
 
 Put simply: **when reliability metadata is in the payload, everyone has to agree on the payload format. When it is in the protocol, the protocol is the agreement.**
+
+#### But Wait — Doesn't MQTT 5.0 Already Have a Sequence Number?
+
+MQTT v5.0 does include a Packet Identifier, but it is not a message sequence number in the sense required for ordering or replay.
+
+The Packet Identifier:
+- Is 16-bit and wraps frequently
+- Exists only for QoS handshake state, not for message identity
+- Is scoped to a single client session
+- Is reused once the QoS exchange completes
+- Resets on reconnect
+
+Because of these properties, the Packet Identifier cannot be used to determine message ordering across sessions or after reconnect. If a consumer disconnects and reconnects, the next message may reuse an earlier Packet Identifier, making it impossible to determine whether the message is new, duplicated, or missing.
+
+In other words, **the Packet Identifier tracks delivery acknowledgement state, not message position in a stream.**
+
+This is why industrial deployments that require ordering or deduplication add their own application-layer sequence numbers in the payload. [Sparkplug B](https://sparkplug.eclipse.org/specification/), for example, defines its own `seq` field precisely because MQTT provides no protocol-level sequence for messages.
+
+MQTT v6.0 introduces a true message sequence number:
+- **Broker-assigned** — publishers do not need to maintain counters
+- **Cluster-wide** — valid across all nodes, not scoped to a single connection
+- **Monotonic** — always increasing within a queue's lifetime
+- **Immutable once assigned** — the sequence number is permanent
+- **Stable across client sessions** — persists through disconnections and reconnections
+
+This sequence number (Property `0x30`) identifies **the message itself**, not the delivery attempt.
+
+The distinction is crucial:
+
+| | MQTT v5.0 Packet Identifier | MQTT v6.0 Stream Sequence Number |
+|--|--|--|
+| **Purpose** | Tracks QoS handshake state | Tracks message position in the stream |
+| **Scope** | Per-session | Cluster-wide |
+| **Lifecycle** | Reused and reset | Monotonic and immutable |
+| **Ordering** | Not usable for ordering | Basis for ordering, deduplication, and replay |
 
 ### 2.3 No Pull-Based Flow Control
 
