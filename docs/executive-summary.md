@@ -63,12 +63,16 @@ An extension to `SUBSCRIBE` that adds two new consumer modes beyond the loose `$
 
 ## Compatibility Strategy
 
-v6.0 is designed to coexist with v5.0:
+MQTT v6.0 is backward-compatible with MQTT v5.0 for all unchanged v5.0 use cases: existing packet types, properties, topics, and semantics continue to work as before. A v5.0 or v3.1.1 client connecting to a v6.0 broker for standard pub/sub sees no difference in behavior.
 
-- All new properties use IDs in the reserved range (`0x30–0x45`) that v5.0 brokers and clients are required to ignore.
-- The `$queue/` namespace gracefully degrades to standard topic behavior on v5.0 brokers (with appropriate ACL controls).
+Compatibility is not wire-transparent for v6.0-only features (FETCH, `$queue/`, Stream Sequence properties, `last-seq`/`epoch`); those require either Protocol Level 6 or the specified v5.0 compatibility mode. Specifically:
+
+- All new properties use IDs in the reserved range (`0x30–0x45`) that v5.0 brokers and clients are required to ignore — no harm to v5.0 peers.
+- The `$queue/` namespace is ACL-protected; v5.0 clients that have not completed the v6.0 handshake are rejected.
 - A **Compatibility Layer** maps every native v6.0 feature to v5.0 User Properties and system topics, enabling mixed-version deployments.
 - A negotiation handshake (`mqtt-ext: v6.0` in CONNECT/CONNACK) allows clients and brokers to detect v6.0 support and fall back gracefully.
+
+**The key guarantee:** if you do not use `$queue/`, FETCH, or Stream Sequence properties, your deployment is fully compatible with v5.0 — no behavioral changes, no additional overhead, no migration required. See [Compatibility Boundaries](motivation.md#compatibility-boundaries) for the full scenario matrix.
 
 ---
 

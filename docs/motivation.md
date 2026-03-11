@@ -40,13 +40,15 @@ MQTT v6.0 is targeted at a specific tier of industrial and enterprise IoT deploy
 
 ### Who Should Stay on MQTT v5.0
 
-If your deployment matches any of the following profiles, v5.0 is the right choice and v6.0 adds complexity without benefit:
+MQTT v6.0 is designed as a strict superset of MQTT v5.0: existing publish-subscribe use cases continue to work unchanged, while deployments that require durable queues and ordered replay can opt into the new capabilities. If your deployment matches any of the following profiles, v5.0 is the right choice and v6.0 adds complexity without benefit:
 
 - Simple telemetry from sensors to a single backend consumer
 - Devices with less than 256 KB available memory
 - Short message lifetimes where loss is acceptable (dashboards, live monitoring)
 - No requirement for competing consumers or consumer group semantics
 - Broker infrastructure managed by a single operator with no cluster failover requirements
+
+These deployments can connect to a v6.0 broker without modification — the broker serves v5.0 and v3.1.1 clients identically to a v5.0 broker. The v6.0 extensions are only activated when a client explicitly opts in via the v6.0 handshake.
 
 ---
 
@@ -205,9 +207,9 @@ This is a departure from v5.0's "retained message" feature, which is per-topic a
 
 ### Principle 2: Consumers Control Their Own Rate
 
-Pull-based FETCH (not push) is the default for `$queue/` consumption. A consumer that is slow, restarting, or catching up a backlog is never flooded. It fetches when it is ready.
+Pull-based FETCH (not push) is the default for `$queue/` consumption. A consumer that is slow, restarting, or catching up a backlog is never flooded. It fetches when it is ready. This is an intentional departure from v5.0's push-all model — but it applies **only to `$queue/` topics**, not to standard pub/sub.
 
-Push subscriptions remain available for compatibility and for use cases where push semantics are correct (live telemetry monitoring, real-time dashboards).
+Push subscriptions remain available for all non-queue topics and for use cases where push semantics are correct (live telemetry monitoring, real-time dashboards). A v6.0 broker serving standard pub/sub traffic behaves identically to a v5.0 broker.
 
 ### Principle 3: Sequence Numbers Are a First-Class Protocol Citizen
 
@@ -225,10 +227,13 @@ No application-layer failover logic is required. No broker-specific reconnect AP
 
 ### Principle 5: Backward Compatibility Is a Non-Negotiable Constraint
 
-MQTT v6.0 is designed so that:
-- A v6.0 broker can serve v5.0 and v3.1.1 clients without modification
+MQTT v6.0 is backward-compatible with MQTT v5.0 for all unchanged v5.0 use cases: existing packet types, properties, topics, and semantics continue to work as before. Specifically:
+
+- A v6.0 broker can serve v5.0 and v3.1.1 clients without modification — these clients see no difference in behavior
 - A v5.0 broker can serve v6.0 clients in compatibility mode (via User Properties and Virtual FETCH)
 - The migration from v5.0 to v6.0 does not require a flag-day cutover
+
+Compatibility is not wire-transparent for v6.0-only features: FETCH (Type 16), `$queue/` persistence semantics, Stream Sequence properties, and `last-seq`/`epoch` reconnection require either Protocol Level 6 or the specified v5.0 compatibility mode. See [§7 Compatibility Boundaries](#compatibility-boundaries) for exact details.
 
 The compatibility layer is specified precisely enough that it can be implemented as a HiveMQ Extension Plugin without modifying the core broker.
 
@@ -281,7 +286,7 @@ MQTT v6.0 explicitly does not aim to:
 
 ## 7. Relationship to the MQTT v5.0 Specification
 
-MQTT v6.0 is a **strict superset of MQTT v5.0**. Every feature defined in the OASIS MQTT v5.0 specification remains valid and unchanged. The additions in v6.0 are:
+MQTT v6.0 is a **strict superset of MQTT v5.0**: existing publish-subscribe use cases continue to work unchanged, while deployments that require durable queues and ordered replay can opt into the new capabilities. Every feature defined in the OASIS MQTT v5.0 specification remains valid and unchanged. The additions in v6.0 are:
 
 1. **New packet type**: FETCH (Control Packet Type 16) — absent from v5.0
 2. **New property identifiers**: `0x30` through `0x35`, `0x41` through `0x42` — reserved ranges not used by v5.0
@@ -290,3 +295,19 @@ MQTT v6.0 is a **strict superset of MQTT v5.0**. Every feature defined in the OA
 5. **New CONNECT fields**: `last-seq` and `epoch` for stateful reconnection
 
 No existing v5.0 packet types, property identifiers, or semantics are modified or removed.
+
+### Compatibility Boundaries
+
+MQTT v6.0 is backward-compatible with MQTT v5.0 for all unchanged v5.0 use cases. The following table defines exactly when compatibility is guaranteed and when compatibility mode is required:
+
+| Scenario | Compatible? | Notes |
+|----------|:-:|-------|
+| v5.0 client → v6.0 broker, standard pub/sub | **Yes — fully transparent** | Client sees no difference. No v6.0 features activated. |
+| v3.1.1 client → v6.0 broker, standard pub/sub | **Yes — fully transparent** | Same as above. |
+| v6.0 client → v6.0 broker, `$queue/` + FETCH | **Yes — native mode** | Protocol Level 6. Full binary efficiency. |
+| v6.0 client → v5.0 broker, compatibility mode | **Yes — via compat layer** | Client uses Protocol Level 5 + `mqtt-ext: v6.0` User Property. FETCH tunneled via `$SYS/queues/*/fetch`. Seq/Epoch carried as User Properties. Requires v6.0-aware extension on the v5.0 broker. |
+| v6.0 client → v5.0 broker, native FETCH packet | **No — connection rejected** | v5.0 broker rejects Protocol Level 6 with Reason Code `0x84`. Client MUST fall back to compatibility mode. |
+| v5.0 client → v6.0 broker, `$queue/` topics | **No — rejected by ACL** | v6.0 broker MUST reject `$queue/` access from clients that have not completed the v6.0 handshake. |
+| v6.0 properties on non-queue topics | **Ignored** | v5.0 clients and brokers MUST ignore unknown property IDs per the v5.0 spec. No harm, no benefit. |
+
+**The key guarantee:** If you do not use `$queue/`, FETCH, Stream Sequence, or `last-seq`/`epoch`, your deployment is fully compatible with v5.0 — no behavioral changes, no additional overhead, no migration required. The v6.0 extensions activate only when explicitly opted into.

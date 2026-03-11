@@ -396,6 +396,10 @@ When a consumer subscribes with `v6-semantics: exclusive`:
 
 ## 6. Compatibility Layer
 
+MQTT v6.0 is backward-compatible with MQTT v5.0 for all unchanged v5.0 use cases: existing packet types, properties, topics, and semantics continue to work as before. Compatibility is not wire-transparent for v6.0-only features such as FETCH, `$queue/`, Stream Sequence properties, or `last-seq`/`epoch`; those require either Protocol Level 6 or the compatibility mode specified below.
+
+**Compatibility guarantee:** A v5.0 or v3.1.1 client connecting to a v6.0 broker for standard publish-subscribe sees no difference in behavior. The v6.0 extensions activate only when a client explicitly opts in via the negotiation handshake.
+
 ### 6.1 Negotiation
 
 | Mode | Protocol Level | User Property |
