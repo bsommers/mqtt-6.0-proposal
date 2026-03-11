@@ -153,7 +153,9 @@ Both reviewers acknowledge that 2.2 (message ordering across sessions) is a vali
 
 **Georg's criticism:** MQTT v5.0's [`Receive Maximum`](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901049) plus the frequency of client acknowledgments already provides flow control.
 
-**`Receive Maximum` is a window size limiter, not a pull mechanism.** It caps the number of QoS 1/2 messages the broker can have in-flight simultaneously. The broker still pushes — it just pushes in a bounded window.
+**Georg is right that `Receive Maximum` provides flow control — it does.** It caps the number of QoS 1/2 messages the broker can have in-flight simultaneously, and combined with ack pacing, it lets consumers influence delivery rate. The proposal does not claim v5.0 "lacks flow control."
+
+**The distinction is between push-based flow control and pull-based flow control.** `Receive Maximum` operates within a push model: the broker initiates delivery as soon as an ack frees a slot. The consumer controls the rate but not the timing.
 
 Here is the distinction that matters in practice:
 
@@ -302,7 +304,7 @@ The genesis for this thinking is 2.5 years of watching our customers solve these
 |-----------|----------|
 | "2.1 is just a shared subscription" | No. The v5.0 spec itself contradicts this: `[MQTT-4.8.2-5]` prohibits re-routing unacked messages to other consumers (messages are lost), `[MQTT-4.6.0-6]` scopes ordering to non-shared subs only, and the spec provides no normative requirement to buffer messages when no subscriber exists. HiveMQ built Declared Shared Subscriptions as a proprietary extension precisely because `$share/` lacks durable queue semantics. |
 | "2.2 conflates concepts" | Fair. The proposal does NOT enlarge Packet Identifiers. Stream Sequence is a separate 5-byte property for a separate purpose (ordering, gap detection, dedup), added only to `$queue/` messages. Standard pub/sub is unaffected. |
-| "2.3 is Receive Maximum" | `Receive Maximum` caps the in-flight window but the broker still pushes. The consumer cannot say "stop sending until I ask." FETCH inverts the model — no request, no delivery. This eliminates the slow consumer death spiral I have seen repeatedly in customer deployments. |
+| "2.3 is Receive Maximum" | `Receive Maximum` provides valid push-based flow control. FETCH provides a different semantic model — pull-based consumption — where the consumer controls timing, not just rate. Both serve valid purposes; they are complementary, not redundant. |
 | "2.4 is plainly wrong" | The Epoch is not an implementation detail — it is a protocol-level signal carried in CONNACK that tells the client whether broker message state is continuous. It does not prescribe clustering, topology, or architecture. A single-node broker can use it. It is analogous to the Session Present flag but for queue sequence state. |
 | "Protocol doesn't concern itself with broker nodes" | Agreed — and the Epoch doesn't either. It defines client-facing behavior: "if sequence continuity cannot be guaranteed, tell the client." How the broker determines this internally is implementation-defined. |
 | "This should be application-level" | Every customer I have worked with has built these primitives in application code. None of their implementations are compatible. The broker cannot optimize what it cannot see. Sparkplug already proves the need. v6.0 standardizes the pattern. |

@@ -40,7 +40,7 @@ The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**, **
 | **SQMC** | Single-Queue Multi-Consumer — a queuing pattern where each message is delivered to exactly one of multiple active consumers |
 | **Virtual FETCH** | Compatibility-mode representation of FETCH using PUBLISH to `$SYS/queues/{name}/fetch` |
 | **High-Watermark** | The last sequence number successfully processed by a consumer client |
-| **Distributed Sequence Counter** | A cluster-wide atomic counter maintained in HiveMQ's replication data grid, one per `$queue/`; any node may increment it atomically to claim the next sequence number |
+| **Distributed Sequence Counter** | A cluster-wide atomic counter, one per `$queue/`; any node may increment it atomically (e.g., via compare-and-swap) to claim the next sequence number. The storage and replication mechanism is implementation-defined. |
 | **Competing Consumer** | SQMC mode: messages distributed round-robin; each message delivered to exactly one consumer |
 | **Exclusive Consumer** | SQMC mode: one designated consumer receives all messages; others are hot standbys |
 
@@ -101,7 +101,7 @@ MQTT v6.0 introduces four new Property Identifiers in the reserved range (`0x30�
 
 - **Type:** Two Byte Integer (16-bit unsigned, big-endian)
 - **Packets:** PUBLISH, CONNACK, DISCONNECT
-- **Normative:** The Broker MUST include the current Epoch in CONNACK for resuming sessions. The Broker MUST increment the Epoch when it cannot guarantee sequence continuity after a cluster partition or replication quorum loss (see Section 4.3.2). HiveMQ does not use leader election; Epoch increments are driven by partition events, not node promotions. A Client that receives an Epoch value greater than its stored Epoch MUST discard its local idempotency table and perform a full application-layer resynchronization.
+- **Normative:** The Broker MUST include the current Epoch in CONNACK for resuming sessions. The Broker MUST increment the Epoch when it cannot guarantee sequence continuity (see Section 4.3.2 for the exhaustive list of triggering conditions). A Client that receives an Epoch value greater than its stored Epoch MUST discard its local idempotency table and perform a full application-layer resynchronization.
 - **Purpose:** Identifies the "era" of a queue's sequence space. Allows clients to distinguish between a sequence gap (a missed message) and a cluster reset (all previous sequence context is invalid).
 
 #### 2.2.3 Throughput Limit (0x41)
@@ -268,6 +268,19 @@ The Broker responds to a FETCH by publishing messages with the standard PUBLISH 
 
 Topics prefixed with `$queue/` represent **Named Queues** — durable, ordered message stores that exist independently of client sessions.
 
+#### 4.1.0 `$queue/` Behavior by Packet Type
+
+The `$queue/` prefix changes packet semantics as follows:
+
+| Packet | Standard Topic Behavior | `$queue/` Topic Behavior |
+|--------|------------------------|--------------------------|
+| **PUBLISH (inbound)** | Delivered immediately to matching subscribers | Persisted to non-volatile storage, assigned Stream Sequence Number, acknowledged only after persistence confirmed |
+| **PUBLISH (outbound)** | Pushed to subscriber as soon as available | Delivered only in response to a FETCH request (or active push subscription in compat mode); includes Stream Sequence Number and Epoch properties |
+| **SUBSCRIBE** | Creates a live subscription; broker pushes matching messages | Registers the client as a consumer of the named queue; delivery mode depends on `v6-semantics` property (default: pull via FETCH) |
+| **UNSUBSCRIBE** | Removes subscription; no further messages delivered | Deregisters the consumer; queue continues to exist and buffer messages independently |
+| **FETCH** | N/A (not applicable to standard topics) | Requests a batch of messages from the named queue; broker responds with up to `Batch Size` messages |
+| **CONNECT (with `v6-last-seq`)** | N/A (property ignored for standard topics) | Broker uses the client's last-seq and epoch to resume delivery from the correct position |
+
 #### 4.1.1 Persistence
 
 - **Normative:** The Broker MUST store messages published to `$queue/` topics in non-volatile storage before acknowledging the PUBACK (QoS 1) or PUBCOMP (QoS 2).
@@ -278,8 +291,12 @@ Topics prefixed with `$queue/` represent **Named Queues** — durable, ordered m
 
 #### 4.1.2 Ordering
 
-- **Normative:** The Broker MUST deliver messages to consumers in strict ascending order of their `Stream Sequence Number`.
+The ordering invariant is: **per-queue, per-consumer (or per-consumer-group).**
+
+- **Normative:** The Broker MUST deliver messages to each individual consumer in strict ascending order of their `Stream Sequence Number` within a given `$queue/{name}`.
 - The Broker MUST NOT deliver a message with Sequence N+1 before the consumer has acknowledged Sequence N (for QoS 1 and 2 delivery).
+- In **Competing Consumer** mode, ordering is guaranteed per-consumer within the group, but not globally across all consumers in the group (since messages are distributed round-robin). Global ordering across the group is achievable only with a single active consumer (Exclusive mode).
+- In **Exclusive Consumer** mode, ordering is globally guaranteed because only one consumer is active at any time.
 
 #### 4.1.3 Storage Limits
 
@@ -309,31 +326,63 @@ For deployments where clients or brokers do not support Protocol Level 6:
 3. **Response:** The Broker releases the next N messages from the persistent queue to the Client's session
 4. **Normative:** The Broker MUST NOT release more than N messages per request. If no Virtual FETCH is active, the Broker MUST NOT push queue messages to the Client.
 
-#### 4.2.3 Rate Limiting
+#### 4.2.3 Semantic Equivalence Requirement
+
+**Normative:** The Virtual FETCH mechanism (Section 4.2.2) and the native FETCH packet (Section 4.2.1) MUST provide identical observable behavior to the consumer. Specifically:
+
+- The set of messages returned for a given queue state and batch size MUST be the same regardless of which mechanism is used.
+- Ordering guarantees (Section 4.1.2) MUST be preserved in both modes.
+- Stream Sequence Number and Stream Epoch values MUST be present in delivered messages in both modes (as native properties in Track A; as User Properties `v6-seq` and `v6-epoch` in Track B).
+- The broker MUST NOT push unsolicited `$queue/` messages in either mode.
+
+A conformant implementation MUST pass the same test suite for both mechanisms. The only permitted differences are wire encoding (binary properties vs. string User Properties) and transport overhead.
+
+#### 4.2.4 Rate Limiting
 
 - **Throughput Limit (0x41) in CONNACK:** Broker-enforced KB/s limit on client publish rate
 - **Reason Code 0x9B (Quota Exceeded):** Returned when a Client exceeds the throughput limit
 - The `Receive Maximum` property from v5.0 continues to apply for QoS 1/2 in-flight limits
 
-### 4.3 Cluster Consistency (Shared-Nothing Architecture)
+### 4.3 Cluster Consistency
 
-HiveMQ is a **masterless, shared-nothing cluster**: all nodes are peers, there are no permanent leaders, and no consensus protocol (Raft/Paxos) is used. Any node can accept any publish from any client. v6.0 MUST preserve monotonic sequencing within this constraint using a **Distributed Sequence Counter** rather than a designated leader.
+In a multi-node deployment, any node MAY accept a publish to a `$queue/` topic. The protocol does not mandate a specific cluster topology, consensus algorithm, or replication strategy. v6.0 defines the **client-facing invariants** that any conformant clustered implementation MUST satisfy, using a **Distributed Sequence Counter** model as the reference mechanism.
 
 #### 4.3.1 Distributed Sequence Counter
 
-- **Normative:** Each `$queue/{name}` MUST maintain a single cluster-wide **Distributed Sequence Counter** stored in the Broker's replication data grid (e.g., HiveMQ's internal distributed data store).
-- When a node receives a PUBLISH to a `$queue/` topic, it MUST perform an **atomic increment** (compare-and-swap) on that queue's counter to claim the next sequence number before persisting the message.
-- No routing constraint is imposed on clients or publishers — **any node may sequence any publish**. Monotonicity is guaranteed by the atomic counter, not by sticky routing.
-- If the atomic increment cannot complete because the counter's replication quorum is unavailable (e.g., a network partition has split the cluster), the receiving node MUST reject the PUBLISH with Reason Code `0x97 (Quota Exceeded)` and the client MUST retry after reconnection.
-- The Broker MUST NOT assign a sequence number speculatively (i.e., without a confirmed atomic increment). Speculative assignment risks duplicate sequence numbers across nodes.
+- **Normative:** Each `$queue/{name}` MUST maintain a single logical sequence counter whose increments are serialized across all nodes in the cluster. The storage and replication mechanism for this counter is implementation-defined.
+- When any node receives a PUBLISH to a `$queue/` topic, it MUST obtain the next sequence number **atomically** (e.g., via compare-and-swap, distributed lock, or equivalent) before persisting the message.
+- No routing constraint is imposed on clients or publishers — **any node may sequence any publish**. Monotonicity is guaranteed by the serialized counter, not by sticky routing or leader election.
+- If the sequence counter is temporarily unavailable (e.g., due to a network partition or quorum loss), the receiving node MUST reject the PUBLISH with Reason Code `0x97 (Quota Exceeded)` and the client MUST retry after reconnection.
+- The Broker MUST NOT assign a sequence number speculatively (i.e., without a confirmed serialized increment). Speculative assignment risks duplicate sequence numbers across nodes.
 
 #### 4.3.2 Epoch Management
 
-- **Normative:** The Broker MUST increment the Stream Epoch when it cannot guarantee that the Distributed Sequence Counter's state survived intact. This occurs when:
-  - A network partition resolves and the counter's quorum was lost, leaving the post-partition state uncertain; OR
-  - One or more nodes that held the only replica of unacknowledged `$queue/` messages leave the cluster permanently.
-- The new Epoch MUST be propagated in the next CONNACK or PUBLISH to any Client subscribed to the affected queue, and in a DISCONNECT to Clients that had in-flight messages at the time of the partition.
-- Nodes rejoining after a partition MUST defer to the surviving cluster's Epoch value.
+##### 4.3.2.1 Scope
+
+The Stream Epoch is **per-queue**: each `$queue/{name}` maintains its own independent Epoch value. An Epoch increment on `$queue/A` has no effect on `$queue/B`.
+
+##### 4.3.2.2 Triggering Conditions (Exhaustive)
+
+The Broker MUST increment the Stream Epoch for a given `$queue/{name}` if and only if one of the following conditions is true:
+
+1. **Sequence counter state loss:** The serialized sequence counter for the queue was unavailable during a failure window, and the Broker cannot confirm that no sequence numbers were issued, duplicated, or lost during that window.
+2. **Unrecoverable message loss:** One or more persisted messages in the queue were permanently lost (e.g., all replicas of the message left the cluster before the message was acknowledged by a consumer).
+3. **Sequence wraparound:** The 32-bit sequence space has been exhausted and the counter wraps to 0 (see Annex C).
+
+The Broker MUST NOT increment the Epoch for routine events such as node restarts with intact persistent storage, consumer disconnections, or temporary network latency.
+
+##### 4.3.2.3 Propagation
+
+- The new Epoch MUST be propagated in the next CONNACK or PUBLISH to any Client subscribed to the affected queue, and in a DISCONNECT (with Reason Code `0xA0 Epoch Reset`) to Clients that had in-flight messages from the affected queue at the time of the event.
+- Nodes rejoining after a partition MUST defer to the surviving cluster's Epoch value for each queue.
+
+##### 4.3.2.4 Mixed-Epoch In-Flight Messages
+
+If a Client has in-flight (unacknowledged) messages from Epoch E and the Broker increments to Epoch E+1:
+
+- The Broker MUST send a DISCONNECT with Reason Code `0xA0 (Epoch Reset)` to the Client.
+- The Client MUST discard all unprocessed in-flight messages from Epoch E.
+- On reconnect, the Client MUST include `v6-epoch: E` (its last known Epoch) in CONNECT. The Broker responds with the new Epoch in CONNACK per Section 4.3.3.
 
 #### 4.3.3 Client Failover and Resync
 
@@ -383,12 +432,12 @@ When a consumer subscribes with `v6-semantics: exclusive`:
 |---------|-----------|-----------|
 | Protocol Level | 5 | **6** (or 5 with compat negotiation) |
 | Sequencing | 16-bit Packet ID (per-session, recycled) | **32-bit Stream Sequence (per-queue, persistent)** |
-| Flow Control | Reactive push (Receive Maximum) | **Deterministic pull (FETCH / Virtual FETCH)** |
+| Flow Control | Push-based (Receive Maximum bounds in-flight window) | **Push + Pull: Receive Maximum for pub/sub; FETCH for queue consumption** |
 | Queue Type | Session-bound implicit queue | **Named durable queue (`$queue/` namespace)** |
 | Consumer Patterns | Shared Subscriptions (loose) | **SQMC: Competing + Exclusive with message locking** |
 | Cluster Consistency | Implementation-defined, opaque to clients | **Epoch-based failover; client-visible resync** |
 | Ordering Guarantee | Hop-by-hop, best effort | **Global monotonic ordering within queue** |
-| Backpressure | None (push floods consumers) | **Broker buffers; consumer controls release rate** |
+| Backpressure | Receive Maximum limits in-flight count | **FETCH adds consumer-initiated pull; broker buffers until requested** |
 | Rate Limiting | None | **Throughput Limit property in CONNACK** |
 | New Packet Types | None (Types 1-15) | **FETCH (Type 16)** |
 
@@ -430,15 +479,30 @@ A v5.0 broker with a v6.0 Extension Plugin MUST:
 
 ---
 
-## 7. Security
+## 7. Security Considerations
 
-All MQTT v5.0 security requirements (TLS, Enhanced Authentication, SASL/SCRAM) are retained and remain mandatory.
+All MQTT v5.0 security requirements (TLS, Enhanced Authentication, SASL/SCRAM) are retained and remain mandatory. The following subsections define normative security requirements introduced by v6.0.
 
-**[NEW for v6.0]:**
+### 7.1 Access Control for `$queue/` and `$SYS/queues/`
 
 - **Normative:** Access to the `$queue/` namespace MUST be controlled by ACLs. Unauthorized publish or subscribe to `$queue/` topics MUST be rejected with Reason Code `0x87 (Not Authorized)`.
 - **Normative:** Access to `$SYS/queues/*/fetch` control topics MUST be restricted to authenticated clients that have completed the v6.0 handshake.
-- Epoch Reset messages carry the potential to discard a client's idempotency state. Brokers MUST only send Epoch Reset signals when cluster state genuinely cannot guarantee sequence continuity. Malicious or misconfigured Epoch Resets constitute a denial-of-service vector.
+- **Normative:** The Broker MUST NOT allow a client to create, subscribe to, or publish to a `$queue/` topic without first completing the v6.0 negotiation handshake (Section 3.1). Clients that have not negotiated v6.0 MUST be rejected with Reason Code `0x87 (Not Authorized)`.
+
+### 7.2 Epoch Integrity
+
+- **Normative:** The Broker MUST only increment the Stream Epoch under the conditions listed in Section 4.3.2.2 (Triggering Conditions). Sending an Epoch increment outside these conditions is a protocol violation.
+- **Normative:** A spurious Epoch Reset causes all affected clients to discard idempotency state and resynchronize simultaneously. Implementations MUST treat unauthorized or unwarranted Epoch increments as a denial-of-service vector and SHOULD implement rate limiting (no more than N Epoch increments per queue per hour, where N is implementation-defined but SHOULD default to a conservative value such as 5).
+- **Normative:** Epoch changes MUST be logged with timestamps, affected queue names, and triggering conditions for forensic auditing.
+
+### 7.3 Sequence Number Side-Channel
+
+- **Informative:** Stream Sequence Numbers are monotonically increasing and visible to all consumers of a queue. An observer who can read sequence numbers can infer the publication rate of the queue. Deployments where publication rate is sensitive information SHOULD restrict queue subscriptions via ACLs and SHOULD use TLS to prevent network-level observation.
+
+### 7.4 High-Watermark Persistence
+
+- **Normative:** A Client's High-Watermark (last processed sequence number) determines the resumption point on reconnect. If a Client's High-Watermark is tampered with (set to a value higher than actually processed), messages between the true and false watermark are silently skipped. Client implementations MUST persist the High-Watermark atomically with the business-logic processing of each message (Section 4.3.4).
+- **Informative:** The Broker does not validate that a Client's reported `v6-last-seq` is truthful. A malicious client could report a false High-Watermark to skip messages. Deployments requiring tamper-proof watermark tracking SHOULD implement server-side watermark validation.
 
 ---
 
@@ -465,7 +529,7 @@ In SECS/GEM, S2F21 (Remote Start) is mission-critical. Loss of this command can 
 **With v6.0:**
 1. Host publishes S2F21 with `Sequence: 5001, Epoch: 1` to `$queue/secsgem/tool_001/S2F21`
 2. Broker Node A persists to non-volatile storage and assigns Seq 5001
-3. Node A crashes; its replica is gone but the Distributed Sequence Counter and message data survive in other nodes' data grid replicas
+3. Node A crashes; its replica is gone but the sequence counter and message data survive in other nodes' replicated storage
 4. Tool reconnects with `v6-last-seq: 5000` in CONNECT
 5. Node B checks persistent queue: Seq 5001 exists and was never acknowledged
 6. Node B resumes delivery: tool receives S2F21 exactly once

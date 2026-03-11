@@ -61,7 +61,7 @@ Use the unused/reserved property ID space (`0x30`–`0x45`) to define new typed 
 
 ### Pros
 - **Binary-efficient.** Fixed-width integers instead of string user properties.
-- **Fully backward-compatible.** MQTT v5.0 mandates that unknown Property IDs MUST be silently ignored by non-v6 clients and brokers.
+- **Backward-compatible in practice.** MQTT v5.0 mandates that unknown Property IDs MUST be silently ignored by non-v6 clients and brokers. However, these IDs are not formally reserved for v6.0 until an OASIS submission is accepted — there is a pre-standardization window where a future v5.x revision could theoretically assign different semantics to the same IDs.
 - **Minimal parser changes.** Any existing MQTT parser that follows the spec will skip unrecognized properties safely.
 - **Works without Protocol Level change.** Mixed v5.0/v6.0 deployments are seamless.
 
@@ -98,6 +98,10 @@ Full protocol version bump to Level 6. Introduces FETCH as Control Packet Type 1
 - **Breaking change for subscription bits.** A v5.0 broker rejects SUBSCRIBE packets with non-zero reserved bits.
 - **Requires ecosystem update.** Client libraries (paho, gmqtt, Eclipse Mosquitto) must be updated to support Level 6.
 - **Deployment risk.** Mixed v5.0/v6.0 environments require the Compatibility Layer.
+
+### The Dual-Mechanism Trade-Off
+
+Having two mechanisms for the same operation (native FETCH and Virtual FETCH) creates a testing and conformance burden. The specification requires **semantic equivalence** (see spec Section 4.2.3): both mechanisms MUST produce identical observable behavior for any given queue state. A conformant implementation MUST pass the same test suite for both. This trade-off is accepted because the alternative — requiring Protocol Level 6 everywhere — would prevent incremental adoption.
 
 ### Verdict
 **Chosen as the canonical v6.0 specification.** The breaking changes are manageable with the Compatibility Layer (Alternative B) and negotiation handshake. The long-term correctness of a formal protocol is worth the transition cost.

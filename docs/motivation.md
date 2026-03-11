@@ -127,13 +127,15 @@ The distinction is crucial:
 | **Lifecycle** | Reused and reset | Monotonic and immutable |
 | **Ordering** | Not usable for ordering | Basis for ordering, deduplication, and replay |
 
-### 2.3 No Pull-Based Flow Control
+### 2.3 Push-Based Flow Control vs. Pull-Based Flow Control
 
-MQTT v5.0 is push-only. The broker delivers messages to subscribers as fast as they arrive. Consumer-side flow control is limited to:
-- `Receive Maximum` — caps the in-flight window but does not let the consumer control *when* it receives the next batch
-- Disconnecting and reconnecting — a destructive and operationally expensive throttle
+MQTT v5.0 provides flow control via `Receive Maximum` — a mechanism that caps the number of QoS 1/2 messages the broker can have in-flight simultaneously. This is a valid and effective mechanism for bounding the push window. Combined with deliberate ack pacing, it allows consumers to influence the delivery rate.
 
-**The result:** A slow consumer — one doing a database write per message — is flooded. The broker's delivery queue fills the consumer's memory until it crashes. Consumer crashes trigger reconnects, which trigger session resumption, which floods the consumer again. This cycle is well-known in industrial MQTT deployments and is solved today by external rate limiters, message buffers, or complete replacement of the push model with polling.
+However, `Receive Maximum` operates within a **push model**: the broker initiates delivery as soon as an acknowledgment frees a slot. The consumer controls the *rate* of delivery but not the *timing*. There is no mechanism for a consumer to say "hold all messages until I ask for them" without disconnecting (which discards session state if `cleanStart=true`) or withholding acknowledgments (which violates the spirit of QoS contracts).
+
+FETCH introduces a **different semantic model** — pull-based consumption — where the consumer explicitly requests batches. This is not a replacement for `Receive Maximum`; both serve valid purposes. `Receive Maximum` is appropriate for live pub/sub where bounded push is correct. FETCH is for queue consumption where the consumer needs absolute control over *when* it receives messages, not just *how many*.
+
+**The practical difference:** A slow consumer — one doing a database write per message — under the push model fills its in-flight window, processes it, and immediately receives another window. It can never pause, drain its backlog, or catch up without disconnecting. Under the pull model, it fetches when ready. No FETCH = no delivery. Messages remain safely in the durable queue.
 
 ### 2.4 No Cluster-Aware Sequence Numbers
 
@@ -197,7 +199,7 @@ This is not "MQTT trying to become Kafka." It is MQTT extending its native durab
 
 ## 4. Design Principles
 
-MQTT v6.0 is built on five explicit principles, each derived from a lesson learned in large-scale industrial deployments:
+MQTT v6.0 is built on six explicit principles, each derived from a lesson learned in large-scale industrial deployments:
 
 ### Principle 1: The Protocol Must Survive Broker Restarts
 
@@ -227,15 +229,27 @@ No application-layer failover logic is required. No broker-specific reconnect AP
 
 ### Principle 5: Backward Compatibility Is a Non-Negotiable Constraint
 
-MQTT v6.0 is backward-compatible with MQTT v5.0 for all unchanged v5.0 use cases: existing packet types, properties, topics, and semantics continue to work as before. Specifically:
+MQTT v6.0 is backward-compatible with MQTT v5.0 **for all unchanged v5.0 use cases**: existing packet types, properties, topics, and semantics continue to work as before. Specifically:
 
 - A v6.0 broker can serve v5.0 and v3.1.1 clients without modification — these clients see no difference in behavior
-- A v5.0 broker can serve v6.0 clients in compatibility mode (via User Properties and Virtual FETCH)
 - The migration from v5.0 to v6.0 does not require a flag-day cutover
 
-Compatibility is not wire-transparent for v6.0-only features: FETCH (Type 16), `$queue/` persistence semantics, Stream Sequence properties, and `last-seq`/`epoch` reconnection require either Protocol Level 6 or the specified v5.0 compatibility mode. See [§7 Compatibility Boundaries](#compatibility-boundaries) for exact details.
+**Honest about the limits:** Compatibility is not wire-transparent for v6.0-only features. The proposal defines two tracks:
 
-The compatibility layer is specified precisely enough that it can be implemented as a HiveMQ Extension Plugin without modifying the core broker.
+- **Track A (Native v6.0, Protocol Level 6):** Uses FETCH (Type 16) and new property IDs. This is a **breaking change** — a v5.0 broker will reject Protocol Level 6 connections, and a v5.0 client receiving a Type 16 packet will close the connection. Track A requires updated brokers and client libraries.
+- **Track B (Compatibility Mode, Protocol Level 5):** Uses User Properties and Virtual FETCH via `$SYS/` control topics. This works on any v5.0 broker with a v6.0-aware extension plugin. It is functionally complete but carries string-encoding overhead and is not a formal standard — it is an extension convention.
+
+Track B is not a transparent bridge — it requires a v6.0-aware extension on the broker and v6.0-aware client code. It is a migration path, not invisible compatibility. See [§7 Compatibility Boundaries](#compatibility-boundaries) for exact details.
+
+### Principle 6: Layered Standardization
+
+The proposal is structured so that it can be submitted to OASIS incrementally:
+
+1. **Core layer** (submit first): Stream Sequence Number (`0x30`), Stream Epoch (`0x35`), `$queue/` namespace and persistence semantics. These are the minimum viable primitives.
+2. **Consumption layer** (follow-on): FETCH packet (Type 16), Virtual FETCH, batch semantics. Depends on the core layer.
+3. **Consumer group layer** (follow-on): SQMC competing/exclusive modes, consumer group management. Depends on the core layer.
+
+This layering allows the standards committee to evaluate and accept the core primitives independently, without requiring approval of the full feature set in a single submission.
 
 ---
 
