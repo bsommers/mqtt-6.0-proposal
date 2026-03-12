@@ -414,6 +414,7 @@ When a consumer subscribes with `v6-semantics: competing`:
 - **Failover:** If the consumer disconnects before acknowledging, the Broker MUST immediately unlock the message and deliver it to the next available consumer in the group.
 - **Round-Robin:** The Broker distributes messages across consumers in the group using round-robin or least-loaded assignment. The specific algorithm is implementation-defined.
 - **Normative:** Each message MUST be delivered to exactly one consumer in a Competing Consumer group.
+- **Normative:** When dispatching a message in Competing Consumer mode, the Broker MUST include all message properties — including payload encryption properties (`0x3A`, `0x3B`, `0x3C`) — unchanged in the PUBLISH delivered to the consumer.
 
 #### 4.4.2 Exclusive Consumer Mode
 
@@ -423,6 +424,7 @@ When a consumer subscribes with `v6-semantics: exclusive`:
 - All subsequent subscribers become **Hot Standbys** — they receive no messages while the Primary is connected.
 - **Normative:** If the Primary Consumer disconnects, the Broker MUST immediately promote the first Standby to Primary and resume delivery from the last acknowledged sequence.
 - **Ordering guarantee:** Because only one consumer is ever active, strict ordering is preserved across failover.
+- **Normative:** When delivering a message to the Primary Consumer in Exclusive mode, the Broker MUST include all message properties — including payload encryption properties (`0x3A`, `0x3B`, `0x3C`) — unchanged in the PUBLISH packet.
 
 ---
 
@@ -536,7 +538,8 @@ Three new optional properties carry encryption metadata on PUBLISH packets. Thes
 | `0x3B` | **Payload Algorithm** | Byte | Enum identifying the encryption algorithm. See Section 7.6.3. |
 | `0x3C` | **Payload Key Version** | Two Byte Integer | Key rotation counter. Consumers can detect key rotation events without changing the Key ID. |
 
-These properties MUST NOT appear on PUBLISH packets whose payloads are not encrypted. A broker that receives these properties MUST forward them to subscribers unchanged; it MUST NOT attempt to decrypt or re-encrypt payloads.
+- **Normative:** Encryption properties (`0x3A`, `0x3B`, `0x3C`) MUST only appear on PUBLISH packets to `$queue/` topics carrying encrypted payloads. A PUBLISH to a non-`$queue/` topic carrying these properties is malformed. Brokers MAY reject such packets with Reason Code `0x8A (Invalid Argument)`.
+- **Normative:** A Broker that receives a PUBLISH with encryption properties MUST forward them to subscribers unchanged. The Broker MUST NOT attempt to decrypt or re-encrypt payloads.
 
 #### 7.6.3 Payload Algorithm Enum (Property `0x3B`)
 
@@ -573,6 +576,12 @@ Key distribution, key rotation procedures, key revocation, and certificate manag
 #### 7.6.7 Interaction with Stream Sequence Numbers
 
 Stream Sequence Numbers (`0x30`) are assigned to the encrypted payload as a whole. The sequence number does not depend on plaintext content. Gap detection, high-watermark tracking, and epoch resync operate identically whether the payload is encrypted or not — all sequence semantics are in the MQTT properties layer, not the payload.
+
+#### 7.6.8 Backward Compatibility with MQTT v5.0 Clients
+
+**Normative:** MQTT v5.0 clients MUST NOT be exposed to encrypted payloads on `$queue/` topics. The v6.0 handshake gate (Section 3.1) is the primary enforcement mechanism: a client that has not completed the `mqtt-ext: v6.0` negotiation MUST be rejected with Reason Code `0x87 (Not Authorized)` when attempting to SUBSCRIBE to any `$queue/` topic. Since v5.0 clients do not send the `mqtt-ext: v6.0` User Property in CONNECT, they cannot pass this gate and will never receive encrypted payloads.
+
+**Informative:** In the event that a conformant MQTT v5.0 client inadvertently receives a PUBLISH packet carrying encryption properties (`0x3A`, `0x3B`, `0x3C`), the MQTT v5.0 specification mandates that the client silently ignore unknown property IDs. No protocol-level error or connection closure is triggered. Any failure is at the application layer (the client receives ciphertext it cannot interpret), not at the protocol layer. This provides a defense-in-depth guarantee: the handshake gate is the primary protection; the unknown-property rule is the fallback.
 
 ---
 
