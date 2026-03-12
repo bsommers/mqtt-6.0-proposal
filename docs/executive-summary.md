@@ -4,6 +4,8 @@
 
 **MQTT v6.0** is a proposed evolutionary extension to the MQTT v5.0 protocol that adds **targeted industrial queuing primitives** to the broker tier — without changing the edge protocol that millions of devices already run.
 
+A companion compatibility profile — **MQTT Reliable Secure Streams Profile (MQTT-RSSP)** — provides the same semantics over existing MQTT 5.0 brokers without requiring protocol-level changes, enabling incremental adoption.
+
 It is **not** a general-purpose upgrade. It is **not** "MQTT trying to become Kafka." It targets a specific tier of deployment: **semiconductor manufacturing ([SECS/GEM](https://en.wikipedia.org/wiki/SECS/GEM)), energy grid SCADA ([IEC 61850](https://en.wikipedia.org/wiki/IEC_61850)), and large-scale industrial IoT** — environments where MQTT v5.0 is already deployed at the edge but operators are forced to bolt on Kafka or AMQP at the broker tier to get durable queuing, ordered delivery, and consumer group semantics. v6.0 eliminates that bridge.
 
 **Why standardize now rather than ship vendor extensions first?** Because the extension-first path leads to fragmentation — just as `$SYS/` was implemented differently by every broker and remains unstandardized 15 years later. Standardizing these patterns at the protocol level before vendors fragment gives the ecosystem a single interoperable wire representation. See [Why Standardize Now](rebuttals.md#why-standardize-now--not-ship-an-extension-first) for the full argument.
@@ -28,7 +30,7 @@ These gaps are currently "solved" by embedding sequence numbers, idempotency key
 
 ## The Solution
 
-MQTT v6.0 introduces five targeted additions to the protocol. In compatibility mode (Track B), these additions use v5.0 User Properties and control topics that are transparent to existing parsers. In native mode (Track A, Protocol Level 6), a new packet type (FETCH) and new property IDs are introduced that require updated client libraries and brokers:
+MQTT v6.0 introduces six targeted additions to the protocol. In compatibility mode (Track B), these additions use v5.0 User Properties and control topics that are transparent to existing parsers. In native mode (Track A, Protocol Level 6), a new packet type (FETCH) and new property IDs are introduced that require updated client libraries and brokers:
 
 ### 1. 32-bit Stream Sequence Numbers
 A new Property (`0x30`) carrying a monotonic, cluster-wide 32-bit integer is attached to every message in the `$queue/` namespace. This allows consumers to detect gaps (`received Seq 1002 but expected 1001`), perform deduplication, and implement application-level exactly-once processing without embedding logic in payloads.
@@ -42,13 +44,13 @@ Topics prefixed with `$queue/` are treated as first-class queue entities: persis
 ### 4. Pull-Based Flow Control (FETCH)
 A new `FETCH` Control Packet (Type 16) lets consumers explicitly request batches of messages from the broker. The broker holds messages in the persistent queue and releases them only when asked. This eliminates the "thundering herd" problem where a recovering consumer is flooded with backlogged messages. For v5.0-compat environments, a Virtual FETCH mechanism uses a `$SYS/` control topic instead.
 
-### 5. Mandatory TLS 1.3 + Optional Payload Encryption (Zero Trust)
-Native Mode v6.0 connections MUST use TLS 1.3, eliminating the vulnerable cipher suites and additional round-trip latency of TLS 1.2. For deployments where the broker must be treated as an untrusted intermediary (zero trust architectures), v6.0 introduces three optional key metadata properties (`0x3A` Key ID, `0x3B` Algorithm, `0x3C` Key Version) that allow end-to-end encrypted payloads to carry the information consumers need to decrypt them — without placing any key material in the protocol. Key management (distribution, rotation, revocation) is explicitly an application-layer responsibility. This feature is entirely opt-in; deployments using TLS 1.3 transport encryption alone are fully conformant.
-
-### 6. Single-Queue Multi-Consumer (SQMC) Semantics
+### 5. Single-Queue Multi-Consumer (SQMC) Semantics
 An extension to `SUBSCRIBE` that adds two new consumer modes beyond the loose `$share/` model:
 - **Competing:** Messages are distributed to exactly one consumer via round-robin, with strict message locking and immediate failover if the consumer disconnects before acknowledging.
 - **Exclusive:** One designated consumer receives all messages; others are hot standbys that take over instantly on failure, preserving strict ordering.
+
+### 6. Mandatory TLS 1.3 + Optional Payload Encryption (Zero Trust)
+Native Mode v6.0 connections MUST use TLS 1.3, eliminating the vulnerable cipher suites and additional round-trip latency of TLS 1.2. For deployments where the broker must be treated as an untrusted intermediary (zero trust architectures), v6.0 introduces three optional key metadata properties (`0x3A` Key ID, `0x3B` Algorithm, `0x3C` Key Version) that allow end-to-end encrypted payloads to carry the information consumers need to decrypt them — without placing any key material in the protocol. Key management (distribution, rotation, revocation) is explicitly an application-layer responsibility. This feature is entirely opt-in; deployments using TLS 1.3 transport encryption alone are fully conformant.
 
 ---
 
@@ -87,9 +89,23 @@ This proposal is intentionally scoped to a single problem domain: adding durable
 
 The recommended standardization path is **layered**: submit the core primitives (Stream Sequence, Epoch, `$queue/` namespace) as a first submission, with FETCH and SQMC as follow-on extensions if the core is accepted. This allows the committee to evaluate the proposal incrementally.
 
-## Reference Implementation Path (HiveMQ)
+## Recommendation
 
-A reference implementation can be built using the HiveMQ Extension SDK:
+Adopt MQTT v6.0 across three dimensions: operational deployment, OASIS standardization, and reference implementation.
+
+### Deployment Phases (Operational)
+
+- **Phase 1 — Compatible Extension (Track B):** Deploy via the HiveMQ Extension Plugin using the User Property shim (`v6-seq`, `v6-epoch`, `v6-semantics`). Zero broker downtime required. Works on any MQTT 5.0 broker today.
+- **Phase 2 — Native v6.0 (Track A):** Once the ecosystem supports Protocol Level 6, migrate to native FETCH packets and Properties `0x30`/`0x35`/`0x3A`–`0x3C` for full binary efficiency and protocol-level enforcement.
+
+### Standardization Path (OASIS)
+
+- **Phase 1 OASIS submission — MQTT Reliable Secure Streams Profile (MQTT-RSSP):** Submit the Track B compatible layer as a broker-transparent interoperability standard. No breaking changes; works on any MQTT 5.0 broker. Establishes the semantic framework (named durable queues, stream sequencing, SQMC modes, Zero Trust key metadata) without requiring a protocol version bump.
+- **Phase 2 OASIS submission — Native v6.0 wire extensions:** Propose Property IDs `0x30`–`0x3C` and the Type 16 FETCH packet as a formal protocol extension once MQTT-RSSP is accepted and the semantic model is validated by the broader ecosystem.
+
+### Reference Implementation (HiveMQ)
+
+A reference implementation can be built using the HiveMQ Extension SDK today:
 
 | Feature | HiveMQ API |
 |---------|-----------|
@@ -99,14 +115,3 @@ A reference implementation can be built using the HiveMQ Extension SDK:
 | Cluster epoch management | `ClusterService` + consistent hashing on queue names |
 
 A proof-of-concept can be built today using a HiveMQ Extension alongside a Python `gmqtt` client shim, without any changes to the core broker binary.
-
----
-
-## Recommendation
-
-Adopt MQTT v6.0 as a **two-phase rollout**:
-
-1. **Phase 1 — Compatible Extension:** Deploy the HiveMQ Extension Plugin that intercepts `v6-*` user properties. Migrate clients to the Python/Java shim. Zero broker downtime required.
-2. **Phase 2 — Native v6.0:** Once the ecosystem supports Protocol Level 6, deprecate the shim layer and use native FETCH packets with full binary efficiency.
-
-This proposal is production-ready as a HiveMQ extension today and provides a clear path to a formal OASIS standardization submission.

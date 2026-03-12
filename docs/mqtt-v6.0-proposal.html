@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>MQTT Version 6.0 Proposal – executive-summary</title>
+  <title>MQTT Version 6.0 Proposal – tc-positioning-strategy</title>
   <style>
     /* Default styles provided by pandoc.
     ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -30,6 +30,53 @@
 <body>
 <nav id="TOC" role="doc-toc">
 <ul>
+<li><a
+href="#tc-positioning-strategy-mqtt-rssp-as-track-b-native-v6.0-as-track-a"
+id="toc-tc-positioning-strategy-mqtt-rssp-as-track-b-native-v6.0-as-track-a">TC
+Positioning Strategy: MQTT-RSSP as Track B, Native v6.0 as Track A</a>
+<ul>
+<li><a href="#the-two-track-strategy" id="toc-the-two-track-strategy">1.
+The Two-Track Strategy</a></li>
+<li><a href="#the-oasis-submission-sequencing"
+id="toc-the-oasis-submission-sequencing">2. The OASIS Submission
+Sequencing</a>
+<ul>
+<li><a href="#phase-1-submission-mqtt-rssp-track-b"
+id="toc-phase-1-submission-mqtt-rssp-track-b">Phase 1 Submission:
+MQTT-RSSP (Track B)</a></li>
+<li><a href="#phase-2-submission-track-a-native-extensions"
+id="toc-phase-2-submission-track-a-native-extensions">Phase 2
+Submission: Track A Native Extensions</a></li>
+<li><a href="#why-this-mirrors-standard-oasis-practice"
+id="toc-why-this-mirrors-standard-oasis-practice">Why This Mirrors
+Standard OASIS Practice</a></li>
+</ul></li>
+<li><a href="#the-compatibility-statement-that-wins-reviewers"
+id="toc-the-compatibility-statement-that-wins-reviewers">3. The
+Compatibility Statement That Wins Reviewers</a></li>
+<li><a href="#answering-the-two-fatal-questions"
+id="toc-answering-the-two-fatal-questions">4. Answering the Two Fatal
+Questions</a>
+<ul>
+<li><a href="#q1-why-isnt-tls-already-sufficient"
+id="toc-q1-why-isnt-tls-already-sufficient">Q1: “Why isn’t TLS already
+sufficient?”</a></li>
+<li><a href="#q2-who-manages-the-keys"
+id="toc-q2-who-manages-the-keys">Q2: “Who manages the keys?”</a></li>
+</ul></li>
+<li><a href="#feature-by-feature-tc-positioning"
+id="toc-feature-by-feature-tc-positioning">5. Feature-by-Feature TC
+Positioning</a></li>
+<li><a href="#what-not-to-say-what-to-say"
+id="toc-what-not-to-say-what-to-say">6. What NOT to Say / What TO
+Say</a></li>
+<li><a href="#estimated-acceptance-probability"
+id="toc-estimated-acceptance-probability">7. Estimated Acceptance
+Probability</a></li>
+<li><a href="#relationship-to-lift-documents"
+id="toc-relationship-to-lift-documents">8. Relationship to Lift
+Documents</a></li>
+</ul></li>
 <li><a href="#executive-summary-mqtt-version-6.0"
 id="toc-executive-summary-mqtt-version-6.0">Executive Summary: MQTT
 Version 6.0</a>
@@ -49,12 +96,12 @@ id="toc-named-durable-queues-queue-namespace">3. Named Durable Queues
 <li><a href="#pull-based-flow-control-fetch"
 id="toc-pull-based-flow-control-fetch">4. Pull-Based Flow Control
 (FETCH)</a></li>
-<li><a href="#mandatory-tls-1.3-optional-payload-encryption-zero-trust"
-id="toc-mandatory-tls-1.3-optional-payload-encryption-zero-trust">5.
-Mandatory TLS 1.3 + Optional Payload Encryption (Zero Trust)</a></li>
 <li><a href="#single-queue-multi-consumer-sqmc-semantics"
-id="toc-single-queue-multi-consumer-sqmc-semantics">6. Single-Queue
+id="toc-single-queue-multi-consumer-sqmc-semantics">5. Single-Queue
 Multi-Consumer (SQMC) Semantics</a></li>
+<li><a href="#mandatory-tls-1.3-optional-payload-encryption-zero-trust"
+id="toc-mandatory-tls-1.3-optional-payload-encryption-zero-trust">6.
+Mandatory TLS 1.3 + Optional Payload Encryption (Zero Trust)</a></li>
 </ul></li>
 <li><a href="#business-impact" id="toc-business-impact">Business
 Impact</a></li>
@@ -63,11 +110,18 @@ id="toc-compatibility-strategy">Compatibility Strategy</a></li>
 <li><a href="#scope-and-standardization-path"
 id="toc-scope-and-standardization-path">Scope and Standardization
 Path</a></li>
-<li><a href="#reference-implementation-path-hivemq"
-id="toc-reference-implementation-path-hivemq">Reference Implementation
-Path (HiveMQ)</a></li>
-<li><a href="#recommendation"
-id="toc-recommendation">Recommendation</a></li>
+<li><a href="#recommendation" id="toc-recommendation">Recommendation</a>
+<ul>
+<li><a href="#deployment-phases-operational"
+id="toc-deployment-phases-operational">Deployment Phases
+(Operational)</a></li>
+<li><a href="#standardization-path-oasis"
+id="toc-standardization-path-oasis">Standardization Path
+(OASIS)</a></li>
+<li><a href="#reference-implementation-hivemq"
+id="toc-reference-implementation-hivemq">Reference Implementation
+(HiveMQ)</a></li>
+</ul></li>
 </ul></li>
 <li><a href="#why-mqtt-v6.0-motivation-rationale-and-intended-audience"
 id="toc-why-mqtt-v6.0-motivation-rationale-and-intended-audience">Why
@@ -106,6 +160,9 @@ Numbers</a></li>
 <li><a href="#shared-subscriptions-have-loose-delivery-semantics"
 id="toc-shared-subscriptions-have-loose-delivery-semantics">2.5 Shared
 Subscriptions Have Loose Delivery Semantics</a></li>
+<li><a href="#why-hivemqs-declared-shared-subscriptions-dont-solve-this"
+id="toc-why-hivemqs-declared-shared-subscriptions-dont-solve-this">Why
+HiveMQ’s Declared Shared Subscriptions Don’t Solve This</a></li>
 </ul></li>
 <li><a href="#why-not-use-kafka-or-amqp"
 id="toc-why-not-use-kafka-or-amqp">3. Why Not Use Kafka or AMQP?</a>
@@ -832,41 +889,405 @@ id="toc-analogues-in-other-protocol-ecosystems">8. Analogues in Other
 Protocol Ecosystems</a></li>
 <li><a href="#references-3" id="toc-references-3">References</a></li>
 </ul></li>
-<li><a href="#tc-positioning-strategy-from-mqtt-6.0-to-mqtt-rssp"
-id="toc-tc-positioning-strategy-from-mqtt-6.0-to-mqtt-rssp">TC
-Positioning Strategy: From “MQTT 6.0” to MQTT-RSSP</a>
-<ul>
-<li><a href="#the-strategic-problem" id="toc-the-strategic-problem">1.
-The Strategic Problem</a></li>
-<li><a href="#the-reframe-two-track-positioning"
-id="toc-the-reframe-two-track-positioning">2. The Reframe: Two-Track
-Positioning</a></li>
-<li><a href="#answering-the-two-fatal-questions"
-id="toc-answering-the-two-fatal-questions">3. Answering the Two Fatal
-Questions</a>
-<ul>
-<li><a href="#q1-why-isnt-tls-already-sufficient"
-id="toc-q1-why-isnt-tls-already-sufficient">Q1: “Why isn’t TLS already
-sufficient?”</a></li>
-<li><a href="#q2-who-manages-the-keys"
-id="toc-q2-who-manages-the-keys">Q2: “Who manages the keys?”</a></li>
-</ul></li>
-<li><a href="#feature-by-feature-tc-positioning"
-id="toc-feature-by-feature-tc-positioning">4. Feature-by-Feature TC
-Positioning</a></li>
-<li><a href="#what-to-avoid-saying" id="toc-what-to-avoid-saying">5.
-What to Avoid Saying</a></li>
-<li><a href="#relationship-to-existing-lift-documents"
-id="toc-relationship-to-existing-lift-documents">6. Relationship to
-Existing Lift Documents</a></li>
-<li><a href="#estimated-tc-acceptance-probability"
-id="toc-estimated-tc-acceptance-probability">7. Estimated TC Acceptance
-Probability</a></li>
-<li><a href="#recommended-next-steps" id="toc-recommended-next-steps">8.
-Recommended Next Steps</a></li>
-</ul></li>
 </ul>
 </nav>
+<h1
+id="tc-positioning-strategy-mqtt-rssp-as-track-b-native-v6.0-as-track-a">TC
+Positioning Strategy: MQTT-RSSP as Track B, Native v6.0 as Track A</h1>
+<blockquote>
+<p><strong>Author:</strong> Bill Sommers, AI Solutions Lead, HiveMQ,
+Inc. <strong>Date:</strong> March 2026 <strong>Status:</strong> Internal
+strategy document — not for external distribution
+<strong>Context:</strong> Synthesizes an external ChatGPT technical
+review into a concrete committee positioning strategy</p>
+</blockquote>
+<hr />
+<h2 id="the-two-track-strategy">1. The Two-Track Strategy</h2>
+<p>The MQTT v6.0 proposal has always contained two separable technical
+layers. The insight from the external review is not that we should
+abandon MQTT 6.0 — it is that we should surface that two-track structure
+explicitly and lead with the right track in OASIS TC discussions.</p>
+<p><strong>Track A — Native MQTT 6.0:</strong> The full protocol
+revision. Protocol Level 6, Type 16 FETCH packet, binary-efficient
+property IDs (0x30, 0x35, 0x3A–0x3C), SQMC native enforcement. This is
+the long-term technical target and the canonical specification. It
+requires updated client libraries and brokers.</p>
+<p><strong>Track B — Compatible Extension (MQTT-RSSP):</strong> The same
+semantics, expressed entirely as User Properties and <code>$SYS/</code>
+control topics over Protocol Level 5. Fully compatible with any
+conformant MQTT 3.1.1 or v5.0 broker. No changes to the wire protocol.
+This is what gets submitted to OASIS first.</p>
+<p>The external review introduced the name <strong>MQTT Reliable Secure
+Streams Profile (MQTT-RSSP)</strong> for the compatible-extension layer.
+That name is exactly right. Track B of MQTT v6.0 <em>is</em> MQTT-RSSP.
+Naming it clearly is a positioning decision, not a technical one — the
+semantics of Track B are already fully specified in the proposal.</p>
+<p>The two-track structure resolves the tension that drives TC
+resistance. The label “MQTT 6.0” by itself signals a major version
+revision: breaking changes, years of TC work, and ecosystem-wide
+migration costs. MQTT-RSSP signals something the TC can evaluate and
+ratify in a fraction of that time. Submitting Track B first does not
+retreat from Track A; it establishes the semantic framework that makes
+Track A’s native optimizations self-evident to the TC once the profile
+is ratified.</p>
+<hr />
+<h2 id="the-oasis-submission-sequencing">2. The OASIS Submission
+Sequencing</h2>
+<h3 id="phase-1-submission-mqtt-rssp-track-b">Phase 1 Submission:
+MQTT-RSSP (Track B)</h3>
+<p>Submit the compatible extension profile to OASIS first. The
+submission scope:</p>
+<ul>
+<li><strong>Stream Sequence Numbers</strong> — User Property
+<code>v6-seq</code> (string-encoded uint32). Establishes the
+gap-detection and idempotency semantics.</li>
+<li><strong>Stream Epoch</strong> — User Property <code>v6-epoch</code>
+(string-encoded uint16). Establishes the session-discontinuity signaling
+semantics.</li>
+<li><strong>Payload Encryption Envelope</strong> — User Properties
+<code>v6-key-id</code>, <code>v6-key-algo</code>,
+<code>v6-key-version</code>. Establishes the broker-transparent
+key-reference envelope.</li>
+<li><strong>SQMC Consumer Modes</strong> — User Property
+<code>v6-semantics</code> in SUBSCRIBE (<code>competing</code> or
+<code>exclusive</code>). Establishes competing/exclusive consumer
+semantics at the subscription level.</li>
+<li><strong>Virtual FETCH</strong> — PUBLISH to
+<code>$SYS/queues/{name}/fetch</code> with User Property
+<code>v6-batch</code>. Establishes the pull-based flow-control
+semantics.</li>
+</ul>
+<p>Every one of these is a semantic reservation: defining what these
+fields mean, how clients must produce and consume them, and what
+conformant broker behavior looks like. Property IDs and packet types are
+not part of Phase 1. The specification language reads as an
+interoperability profile, not a protocol revision.</p>
+<h3 id="phase-2-submission-track-a-native-extensions">Phase 2
+Submission: Track A Native Extensions</h3>
+<p>After MQTT-RSSP is standardized and the semantic framework is
+established, submit the native v6.0 optimizations to OASIS as a protocol
+extension:</p>
+<ul>
+<li>Type 16 FETCH packet — eliminating the round-trip overhead of
+Virtual FETCH.</li>
+<li>Property 0x30 (Four Byte Integer) — binary-efficient Stream Sequence
+Number.</li>
+<li>Property 0x35 (Two Byte Integer) — binary-efficient Stream
+Epoch.</li>
+<li>Properties 0x3A–0x3C (Key ID, Algorithm, Key Version) —
+binary-efficient encryption envelope.</li>
+<li>Protocol Level 6 negotiation — formal CONNECT/CONNACK signaling for
+native v6.0 support.</li>
+<li>SQMC native enforcement — broker-level competing/exclusive consumer
+arbitration.</li>
+</ul>
+<p>At this point, the TC is not being asked to evaluate the semantics —
+those are already ratified in MQTT-RSSP. They are being asked to approve
+an optimized wire encoding for semantics the ecosystem has already
+standardized. This is a much smaller ask.</p>
+<h3 id="why-this-mirrors-standard-oasis-practice">Why This Mirrors
+Standard OASIS Practice</h3>
+<p>This sequencing is how OASIS standards commonly evolve. A profile
+specification establishes what an implementation is required to do. An
+optimized protocol encoding follows once the interoperability baseline
+exists. MQTT-RSSP as profile first, native v6.0 optimizations as
+protocol extension second, follows the same pattern as WS-Security to
+WS-Trust, or AMQP Management to AMQP 1.0.</p>
+<hr />
+<h2 id="the-compatibility-statement-that-wins-reviewers">3. The
+Compatibility Statement That Wins Reviewers</h2>
+<p>Every document prepared for TC review should include this statement,
+verbatim, in the abstract or first paragraph:</p>
+<blockquote>
+<p>“MQTT-RSSP introduces no changes to the MQTT wire protocol and is
+fully interoperable with existing MQTT 3.1.1 and MQTT 5.0 brokers. It is
+a standardized semantic layer that implementations may additionally
+optimize using the native v6.0 extensions in Track A.”</p>
+</blockquote>
+<p>That single paragraph removes approximately 70% of the reflexive TC
+resistance before the technical review begins. It signals:</p>
+<ul>
+<li>No ecosystem disruption — existing deployments are unaffected.</li>
+<li>No breaking changes — every conformant MQTT 5.0 broker can forward
+MQTT-RSSP messages today.</li>
+<li>A clear upgrade path — Track A is positioned as a performance
+optimization, not a requirement.</li>
+</ul>
+<p>A client running MQTT-RSSP on Mosquitto today — using only User
+Properties and payload conventions — is a conformant implementation. A
+client running MQTT-RSSP on HiveMQ with native <code>$queue/</code>
+support gets better performance, stronger durability guarantees, and
+lower latency — but is running the same profile. This is not a
+hypothetical compatibility story; it is the Track B architecture that
+already exists in the proposal.</p>
+<hr />
+<h2 id="answering-the-two-fatal-questions">4. Answering the Two Fatal
+Questions</h2>
+<p>Two questions will be raised in the first TC review session. If they
+are not answered concisely and confidently, they become blockers that
+derail the entire proposal. Do not bury the answers in appendices — put
+them in the abstract.</p>
+<h3 id="q1-why-isnt-tls-already-sufficient">Q1: “Why isn’t TLS already
+sufficient?”</h3>
+<p>TLS protects the transport hop — client to broker to subscriber. It
+terminates at the broker. In a multi-tenant cloud broker, a federated
+bridge deployment, or any infrastructure where the broker is operated by
+a third party, TLS provides no protection against the broker itself. The
+broker decrypts, reads, re-encrypts, and forwards. For semiconductor
+equipment vendors shipping process recipes to tools on a customer’s
+factory floor, the cloud broker IS an attacker surface — not a
+hypothetical one, a contractual one: the broker operator’s SLA
+explicitly disclaims liability for payload content.</p>
+<p>MQTT-RSSP payload encryption (Phase 1: User Properties
+<code>v6-key-id</code>, <code>v6-key-algo</code>,
+<code>v6-key-version</code>; Phase 2: Properties 0x3A–0x3C) protects the
+data across the entire messaging lifecycle, not just the network path.
+The broker forwards an opaque payload with metadata. It cannot read
+process parameters, safety-critical commands, or proprietary control
+sequences. The pattern is precise: TLS = network confidentiality;
+MQTT-RSSP = data confidentiality. They are complementary, not
+redundant.</p>
+<h3 id="q2-who-manages-the-keys">Q2: “Who manages the keys?”</h3>
+<p>The profile defines only how encrypted payloads reference keys: a
+<code>key_id</code>, an <code>algorithm</code> identifier, and a
+<code>key_version</code>. Key distribution, rotation, and revocation are
+explicitly out of scope. Deployments integrate with whatever key
+management they already operate — device provisioning systems,
+enterprise PKI, HSMs, SPIFFE/SPIRE workload identity. The same design
+pattern as TLS SNI: the protocol references an identity, the PKI manages
+it. MQTT-RSSP does not introduce a new key management problem; it
+introduces a standard envelope for referencing keys from whatever system
+already manages them.</p>
+<hr />
+<h2 id="feature-by-feature-tc-positioning">5. Feature-by-Feature TC
+Positioning</h2>
+<p>Each feature needs a two-to-three sentence TC pitch that connects it
+to a concrete, documented ecosystem problem. Abstract arguments about
+reliability do not move standards committees; specific evidence of
+fragmentation does.</p>
+<p>For each feature, the Phase 1 submission (MQTT-RSSP, Track B) is the
+TC ask. The Phase 2 form (Track A native extension) is the optimization
+path presented as future work.</p>
+<p><strong>Stream Sequence Numbers</strong></p>
+<ul>
+<li>Phase 1 (MQTT-RSSP): User Property <code>v6-seq</code>
+(string-encoded uint32 in every PUBLISH).</li>
+<li>Phase 2 (Track A): Property 0x30, Four Byte Integer.</li>
+</ul>
+<p>This standardizes the single most-reimplemented pattern in IIoT MQTT
+deployments. Every Eclipse Sparkplug B deployment already implements a
+64-bit <code>seq</code> field in protobuf payloads for exactly this
+purpose — gap detection and ordered delivery. MQTT-RSSP moves the
+sequence number from a payload-embedded convention into a standard
+envelope property so any client library can implement it once,
+interoperably, without a custom serialization format.</p>
+<p><strong>Stream Epoch</strong></p>
+<ul>
+<li>Phase 1 (MQTT-RSSP): User Property <code>v6-epoch</code>
+(string-encoded uint16 in every PUBLISH).</li>
+<li>Phase 2 (Track A): Property 0x35, Two Byte Integer.</li>
+</ul>
+<p>A simple replay protection mechanism across device restarts and
+broker failovers, analogous to TLS session tickets. The Epoch is a
+monotonically increasing uint16 that subscribers use to detect and
+discard stale replays and to know when their local idempotency state is
+no longer valid. A single-node Mosquitto instance can implement it
+correctly by incrementing a counter on restart. Zero broker architecture
+changes required.</p>
+<p><strong>Payload Encryption Envelope</strong></p>
+<ul>
+<li>Phase 1 (MQTT-RSSP): User Properties <code>v6-key-id</code>,
+<code>v6-key-algo</code>, <code>v6-key-version</code>.</li>
+<li>Phase 2 (Track A): Properties 0x3A (Key ID), 0x3B (Algorithm), 0x3C
+(Key Version).</li>
+</ul>
+<p>Three optional User Properties constitute a broker-transparent
+encrypted envelope. No broker changes. No key material in the protocol.
+Solves the multi-tenant broker trust problem that every large industrial
+MQTT customer has raised independently — the problem that today forces
+them to implement ad-hoc payload encryption with no standard
+key-reference format, making interoperability between equipment vendors
+impossible.</p>
+<p><strong>SQMC (Single-Queue Multi-Consumer)</strong></p>
+<ul>
+<li>Phase 1 (MQTT-RSSP): User Property <code>v6-semantics</code> in
+SUBSCRIBE (<code>competing</code> or <code>exclusive</code>).</li>
+<li>Phase 2 (Track A): SQMC native enforcement in Protocol Level 6
+broker.</li>
+</ul>
+<p>This feature must be framed carefully. Do not present it as a QoS
+replacement. Present it as application-level verifiable delivery
+confirmation for safety-critical command streams. MQTT QoS 1 and QoS 2
+guarantee delivery semantics at the transport layer. SQMC provides
+cryptographic proof — via the sequence number and acknowledgment
+protocol — that the correct subscriber received and validated the
+correct message. This is required for SECS/GEM S2F21 process start
+command handshakes, IEC 61850 grid protection relay sequences, and other
+safety-critical applications where “I sent it and the broker said OK” is
+not a sufficient guarantee.</p>
+<p><strong>FETCH (Pull-Based Flow Control)</strong></p>
+<ul>
+<li>Phase 1 (MQTT-RSSP): Virtual FETCH via PUBLISH to
+<code>$SYS/queues/{name}/fetch</code> with User Property
+<code>v6-batch</code>.</li>
+<li>Phase 2 (Track A): Type 16 FETCH packet (dedicated Control Packet
+Type).</li>
+</ul>
+<p>Virtual FETCH is broker-transparent and implementable today as a
+HiveMQ extension plugin with no wire-protocol changes. It solves the
+“thundering herd” problem where a recovering consumer is flooded with
+backlogged messages. Phase 2 replaces the control-topic round-trip with
+a dedicated packet type, eliminating the overhead of Topic Name encoding
+in the request path. The semantic specification — what the broker MUST
+hold, what it MUST release, what the batch-size bound means — is
+identical in both phases.</p>
+<hr />
+<h2 id="what-not-to-say-what-to-say">6. What NOT to Say / What TO
+Say</h2>
+<p>Language matters in TC submissions. Certain phrases activate
+pattern-matching against past standards failures and produce reflexive
+resistance before the technical argument is heard. For each phrase to
+avoid, there is a preferred alternative that conveys the same technical
+content without the political cost.</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Avoid</th>
+<th>Use instead</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>“MQTT 6.0 protocol revision” (as the primary identifier)</td>
+<td>“MQTT Reliable Secure Streams Profile (MQTT-RSSP)”</td>
+</tr>
+<tr>
+<td>“major protocol revision”</td>
+<td>“interoperability profile”</td>
+</tr>
+<tr>
+<td>“new packet type” (in Phase 1 context)</td>
+<td>“payload convention / User Property extension”</td>
+</tr>
+<tr>
+<td>“breaking change”</td>
+<td>“additive, opt-in extension”</td>
+</tr>
+<tr>
+<td>“broker encryption support”</td>
+<td>“broker-transparent security”</td>
+</tr>
+<tr>
+<td>“we need a new version”</td>
+<td>“we are standardizing patterns already in production”</td>
+</tr>
+<tr>
+<td>“replaces MQTT 5.0 features”</td>
+<td>“complements existing MQTT 5.0 semantics”</td>
+</tr>
+<tr>
+<td>“Track A is the real proposal”</td>
+<td>“Track A provides native wire-efficiency optimizations for the
+standardized profile”</td>
+</tr>
+</tbody>
+</table>
+<p>The argument “we are standardizing patterns already in production” is
+both true and persuasive: Sparkplug B sequence numbers,
+application-layer idempotency tables, and session resume logic are in
+production at scale today. MQTT-RSSP is a standardization of existing
+practice, not a proposal to change practice.</p>
+<p>Critically: do not hide Track A. Present the two-track structure
+transparently. The TC should understand that MQTT-RSSP is Phase 1 and
+that native v6.0 optimizations are Phase 2. Hiding Track A and then
+introducing it later looks like a bait-and-switch. Presenting both
+tracks upfront — with MQTT-RSSP as the submission surface and Track A as
+deferred optimization — demonstrates technical honesty and strategic
+maturity.</p>
+<hr />
+<h2 id="estimated-acceptance-probability">7. Estimated Acceptance
+Probability</h2>
+<p>Based on the external review’s assessment and the positioning
+analysis above:</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Framing</th>
+<th>Probability</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>“MQTT 6.0 protocol revision only (no profile)”</td>
+<td>~10-15%</td>
+<td>Major version, breaking changes, years of TC work; triggers maximum
+resistance before technical merit is heard</td>
+</tr>
+<tr>
+<td>“MQTT-RSSP profile (Track B) + optional Track A optimization”</td>
+<td>~50-70%</td>
+<td>Profile framing = low risk; broker transparency removes ecosystem
+disruption concerns; Track A deferred to Phase 2 after profile is
+ratified</td>
+</tr>
+<tr>
+<td>“MQTT-RSSP profile without Track A”</td>
+<td>~40-60%</td>
+<td>Removes the long-term technical target and native-efficiency story;
+less compelling to TC members evaluating ecosystem impact</td>
+</tr>
+</tbody>
+</table>
+<p>The delta between the bottom and middle rows is entirely structural.
+Track A remains the technical target; positioning it as Phase 2 — an
+optimization of an already-standardized semantic profile — removes the
+barrier to Phase 1 acceptance without abandoning the long-term goal.</p>
+<p>The ~50-70% range under MQTT-RSSP framing is conditional on answering
+the two fatal questions (TLS sufficiency, key management) concisely in
+the abstract, and on keeping payload encryption clearly marked as
+optional. If SQMC is submitted as a separate follow-on to the core
+MQTT-RSSP profile (Stream Sequence + Epoch + payload encryption
+envelope), the acceptance probability for the core submission likely
+rises above 70%.</p>
+<hr />
+<h2 id="relationship-to-lift-documents">8. Relationship to Lift
+Documents</h2>
+<p>The two-track structure maps directly onto the lift document
+architecture options.</p>
+<p><strong>MQTT-RSSP (Track B, Phase 1 submission)</strong> is closest
+to <strong>Option A</strong> (slim protocol with companion profile) and
+to <strong>Option C Phase 1</strong>: the client-side obligations — gap
+detection state machine, epoch resync procedure, high-watermark
+persistence, exactly-once workflow — become the normative content of the
+MQTT-RSSP specification. The broker-side obligations (Property 0x30
+assignment, <code>$queue/</code> persistence, SQMC arbitration) become
+SHOULD/RECOMMENDED behaviors for brokers wishing to natively support
+MQTT-RSSP, rather than MUST requirements gated on a new protocol
+level.</p>
+<p>In Option C terms: the “MQTT Stream 1.0 application protocol” layer
+IS the MQTT-RSSP OASIS submission. Rename it consistently across the
+lift documents before the TC review package is assembled.</p>
+<p><strong>Track A (native v6.0, Phase 2 submission)</strong> maps to
+the HiveMQ product layer and to Option C Phase 2: the “MQTT 6.0
+transport extension” broker obligations (native FETCH enforcement,
+binary Property IDs, Protocol Level 6 CONNECT/CONNACK negotiation) are
+what HiveMQ ships as a competitive differentiator and what Phase 2
+proposes to OASIS once the semantic framework is established.</p>
+<p>The practical consequence: what gets submitted to OASIS first is the
+profile, not the transport. What HiveMQ ships as a product today is the
+native broker support for that profile. The technical content of both
+Track A and Track B is identical to the existing proposal — the only
+change is submission sequencing and primary identifier.</p>
 <h1 id="executive-summary-mqtt-version-6.0">Executive Summary: MQTT
 Version 6.0</h1>
 <h2 id="what-is-this">What Is This?</h2>
@@ -874,6 +1295,10 @@ Version 6.0</h1>
 the MQTT v5.0 protocol that adds <strong>targeted industrial queuing
 primitives</strong> to the broker tier — without changing the edge
 protocol that millions of devices already run.</p>
+<p>A companion compatibility profile — <strong>MQTT Reliable Secure
+Streams Profile (MQTT-RSSP)</strong> — provides the same semantics over
+existing MQTT 5.0 brokers without requiring protocol-level changes,
+enabling incremental adoption.</p>
 <p>It is <strong>not</strong> a general-purpose upgrade. It is
 <strong>not</strong> “MQTT trying to become Kafka.” It targets a
 specific tier of deployment: <strong>semiconductor manufacturing (<a
@@ -928,7 +1353,7 @@ idempotency keys, and acknowledgment logic in message payloads — a
 non-standard, non-interoperable approach.</p>
 <hr />
 <h2 id="the-solution">The Solution</h2>
-<p>MQTT v6.0 introduces five targeted additions to the protocol. In
+<p>MQTT v6.0 introduces six targeted additions to the protocol. In
 compatibility mode (Track B), these additions use v5.0 User Properties
 and control topics that are transparent to existing parsers. In native
 mode (Track A, Protocol Level 6), a new packet type (FETCH) and new
@@ -965,7 +1390,17 @@ eliminates the “thundering herd” problem where a recovering consumer is
 flooded with backlogged messages. For v5.0-compat environments, a
 Virtual FETCH mechanism uses a <code>$SYS/</code> control topic
 instead.</p>
-<h3 id="mandatory-tls-1.3-optional-payload-encryption-zero-trust">5.
+<h3 id="single-queue-multi-consumer-sqmc-semantics">5. Single-Queue
+Multi-Consumer (SQMC) Semantics</h3>
+<p>An extension to <code>SUBSCRIBE</code> that adds two new consumer
+modes beyond the loose <code>$share/</code> model: -
+<strong>Competing:</strong> Messages are distributed to exactly one
+consumer via round-robin, with strict message locking and immediate
+failover if the consumer disconnects before acknowledging. -
+<strong>Exclusive:</strong> One designated consumer receives all
+messages; others are hot standbys that take over instantly on failure,
+preserving strict ordering.</p>
+<h3 id="mandatory-tls-1.3-optional-payload-encryption-zero-trust">6.
 Mandatory TLS 1.3 + Optional Payload Encryption (Zero Trust)</h3>
 <p>Native Mode v6.0 connections MUST use TLS 1.3, eliminating the
 vulnerable cipher suites and additional round-trip latency of TLS 1.2.
@@ -978,16 +1413,6 @@ them — without placing any key material in the protocol. Key management
 (distribution, rotation, revocation) is explicitly an application-layer
 responsibility. This feature is entirely opt-in; deployments using TLS
 1.3 transport encryption alone are fully conformant.</p>
-<h3 id="single-queue-multi-consumer-sqmc-semantics">6. Single-Queue
-Multi-Consumer (SQMC) Semantics</h3>
-<p>An extension to <code>SUBSCRIBE</code> that adds two new consumer
-modes beyond the loose <code>$share/</code> model: -
-<strong>Competing:</strong> Messages are distributed to exactly one
-consumer via round-robin, with strict message locking and immediate
-failover if the consumer disconnects before acknowledging. -
-<strong>Exclusive:</strong> One designated consumer receives all
-messages; others are hot standbys that take over instantly on failure,
-preserving strict ordering.</p>
 <hr />
 <h2 id="business-impact">Business Impact</h2>
 <table>
@@ -1091,10 +1516,40 @@ submit the core primitives (Stream Sequence, Epoch, <code>$queue/</code>
 namespace) as a first submission, with FETCH and SQMC as follow-on
 extensions if the core is accepted. This allows the committee to
 evaluate the proposal incrementally.</p>
-<h2 id="reference-implementation-path-hivemq">Reference Implementation
-Path (HiveMQ)</h2>
+<h2 id="recommendation">Recommendation</h2>
+<p>Adopt MQTT v6.0 across three dimensions: operational deployment,
+OASIS standardization, and reference implementation.</p>
+<h3 id="deployment-phases-operational">Deployment Phases
+(Operational)</h3>
+<ul>
+<li><strong>Phase 1 — Compatible Extension (Track B):</strong> Deploy
+via the HiveMQ Extension Plugin using the User Property shim
+(<code>v6-seq</code>, <code>v6-epoch</code>, <code>v6-semantics</code>).
+Zero broker downtime required. Works on any MQTT 5.0 broker today.</li>
+<li><strong>Phase 2 — Native v6.0 (Track A):</strong> Once the ecosystem
+supports Protocol Level 6, migrate to native FETCH packets and
+Properties
+<code>0x30</code>/<code>0x35</code>/<code>0x3A</code>–<code>0x3C</code>
+for full binary efficiency and protocol-level enforcement.</li>
+</ul>
+<h3 id="standardization-path-oasis">Standardization Path (OASIS)</h3>
+<ul>
+<li><strong>Phase 1 OASIS submission — MQTT Reliable Secure Streams
+Profile (MQTT-RSSP):</strong> Submit the Track B compatible layer as a
+broker-transparent interoperability standard. No breaking changes; works
+on any MQTT 5.0 broker. Establishes the semantic framework (named
+durable queues, stream sequencing, SQMC modes, Zero Trust key metadata)
+without requiring a protocol version bump.</li>
+<li><strong>Phase 2 OASIS submission — Native v6.0 wire
+extensions:</strong> Propose Property IDs
+<code>0x30</code>–<code>0x3C</code> and the Type 16 FETCH packet as a
+formal protocol extension once MQTT-RSSP is accepted and the semantic
+model is validated by the broader ecosystem.</li>
+</ul>
+<h3 id="reference-implementation-hivemq">Reference Implementation
+(HiveMQ)</h3>
 <p>A reference implementation can be built using the HiveMQ Extension
-SDK:</p>
+SDK today:</p>
 <table>
 <colgroup>
 <col style="width: 45%" />
@@ -1129,20 +1584,6 @@ SDK:</p>
 <p>A proof-of-concept can be built today using a HiveMQ Extension
 alongside a Python <code>gmqtt</code> client shim, without any changes
 to the core broker binary.</p>
-<hr />
-<h2 id="recommendation">Recommendation</h2>
-<p>Adopt MQTT v6.0 as a <strong>two-phase rollout</strong>:</p>
-<ol type="1">
-<li><strong>Phase 1 — Compatible Extension:</strong> Deploy the HiveMQ
-Extension Plugin that intercepts <code>v6-*</code> user properties.
-Migrate clients to the Python/Java shim. Zero broker downtime
-required.</li>
-<li><strong>Phase 2 — Native v6.0:</strong> Once the ecosystem supports
-Protocol Level 6, deprecate the shim layer and use native FETCH packets
-with full binary efficiency.</li>
-</ol>
-<p>This proposal is production-ready as a HiveMQ extension today and
-provides a clear path to a formal OASIS standardization submission.</p>
 <h1 id="why-mqtt-v6.0-motivation-rationale-and-intended-audience">Why
 MQTT v6.0? Motivation, Rationale, and Intended Audience</h1>
 <blockquote>
@@ -1481,6 +1922,130 @@ timeout has not expired</p>
 <p><strong>The result:</strong> Building a reliable competing consumer
 pipeline on <code>$share/</code> requires extensive application-layer
 coordination that must be re-implemented for each new deployment.</p>
+<h3 id="why-hivemqs-declared-shared-subscriptions-dont-solve-this">Why
+HiveMQ’s Declared Shared Subscriptions Don’t Solve This</h3>
+<p>HiveMQ <a
+href="https://docs.hivemq.com/hivemq/latest/user-guide/declared-shared-subscriptions.html">Declared
+Shared Subscriptions</a> improve on standard <code>$share/</code> by
+buffering messages even when no subscriber is connected — a real and
+useful improvement over the base spec. But they leave four critical gaps
+open.</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>Capability</th>
+<th><code>$share/</code> (MQTT v5.0 Spec)</th>
+<th>HiveMQ Declared Shared Subscriptions</th>
+<th>SQMC (<code>$queue/</code> + v6.0)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Buffer messages when no subscriber connected</strong></td>
+<td>Not guaranteed — spec is silent</td>
+<td>Yes — HiveMQ’s primary addition</td>
+<td>Yes — <code>$queue/</code> persists independently</td>
+</tr>
+<tr>
+<td><strong>Re-dispatch unacked message on consumer
+disconnect</strong></td>
+<td>No — <code>[MQTT-4.8.2-5]</code> prohibits; message discarded if
+session terminates</td>
+<td>No — <code>[MQTT-4.8.2-5]</code> still applies at spec level</td>
+<td>Yes — lock released immediately; re-dispatched to next available
+consumer</td>
+</tr>
+<tr>
+<td><strong>Exclusive consumer / hot-standby mode</strong></td>
+<td>No</td>
+<td>No</td>
+<td>Yes — primary consumer + automatic standby promotion on
+disconnect</td>
+</tr>
+<tr>
+<td><strong>Message ordering guarantee</strong></td>
+<td>No — <code>[MQTT-4.6.0-6]</code> scopes ordering to non-shared
+subscriptions only</td>
+<td>No</td>
+<td>Yes — strict ascending Stream Sequence Number per queue</td>
+</tr>
+<tr>
+<td><strong>Gap detection</strong></td>
+<td>Impossible — no per-message identity</td>
+<td>Impossible</td>
+<td>Built-in — sequence gaps are detectable and auditable</td>
+</tr>
+<tr>
+<td><strong>Survives broker restart (spec-mandated)</strong></td>
+<td>No — persistence is implementation-defined</td>
+<td>Yes (HiveMQ-specific behavior)</td>
+<td>Yes — persistence to non-volatile storage required before
+PUBACK</td>
+</tr>
+<tr>
+<td><strong>Interoperable across broker vendors</strong></td>
+<td>Yes — standard</td>
+<td>No — HiveMQ-proprietary</td>
+<td>Yes — standardized wire format</td>
+</tr>
+<tr>
+<td><strong>Named, inspectable entity</strong></td>
+<td>No — subscription pattern only</td>
+<td>No — broker config entry only</td>
+<td>Yes — <code>$queue/</code> is a first-class entity with TTL,
+max-size, storage policy</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The critical gap: <code>[MQTT-4.8.2-5]</code>.</strong> <a
+href="https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901250">MQTT
+v5.0 Section 4.8.2, normative requirement
+<code>[MQTT-4.8.2-5]</code></a> states: <em>“If the Client’s Session
+terminates before the Client reconnects, the Server MUST NOT send the
+Application Message to any other subscribed Client.”</em> This means: if
+a consumer in any <code>$share/</code> group — including a Declared
+Shared Subscription — receives a QoS 1 message, disconnects before
+sending PUBACK, and its session expires, the message is
+<strong>discarded</strong>. The spec explicitly prohibits the broker
+from re-delivering it to another consumer. In traditional
+competing-consumer queues (AMQP, JMS, Kafka consumer groups), an
+unacknowledged message is returned to the queue and re-dispatched. In
+MQTT v5.0 shared subscriptions — proprietary or otherwise — it is
+destroyed. SQMC breaks from this by treating <code>$queue/</code> topics
+as session-independent persistent stores: when a competing consumer
+disconnects, the message lock is released and the message is immediately
+re-dispatched regardless of session state.</p>
+<p><strong>The exclusive consumer gap.</strong> Declared Shared
+Subscriptions provide no equivalent to SQMC Exclusive Consumer mode.
+There is no mechanism in any <code>$share/</code> variant — declared or
+dynamic — to designate one consumer as primary and hold others as hot
+standbys that take over instantly on primary disconnect while preserving
+strict ordering. This pattern is non-negotiable for safety-critical
+command streams: SECS/GEM S2F21 (Remote Start), grid protection relay
+commands, and financial settlement messages where exactly one consumer
+must process each message in strict order with zero-delay failover.</p>
+<p><strong>Why this is the argument, not the counterargument.</strong>
+The existence of Declared Shared Subscriptions as a HiveMQ-proprietary
+feature is itself evidence that the MQTT standard has a gap — HiveMQ
+built it because <code>$share/</code> alone did not satisfy customer
+requirements. And yet those same customers are asking for
+re-dispatch-on-failure and exclusive consumer semantics that Declared
+Shared Subscriptions still cannot provide. The extension-first path is
+also how <code>$SYS/</code> became permanently fragmented: EMQX,
+Mosquitto, and HiveMQ each implemented it differently, and 15 years
+later there is still no standard. Standardizing SQMC semantics now —
+before EMQX, AWS IoT Core, and others build incompatible variants —
+avoids repeating that outcome.</p>
+<p><em>For a full side-by-side treatment of this comparison, including
+the normative <code>[MQTT-4.8.2-5]</code> analysis, see the standalone
+reference document <a
+href="sqmc-vs-declared-shared-subscriptions.md"><code>sqmc-vs-declared-shared-subscriptions.md</code></a>.</em></p>
 <hr />
 <h2 id="why-not-use-kafka-or-amqp">3. Why Not Use Kafka or AMQP?</h2>
 <p>This is the most frequently raised objection. The answer depends on
@@ -8219,318 +8784,5 @@ Standard</a></li>
 <code>docs/critiques-and-rebuttals.md</code></li>
 <li>Alternative Approaches: <code>docs/alternatives.md</code></li>
 </ul>
-<h1 id="tc-positioning-strategy-from-mqtt-6.0-to-mqtt-rssp">TC
-Positioning Strategy: From “MQTT 6.0” to MQTT-RSSP</h1>
-<blockquote>
-<p><strong>Author:</strong> Bill Sommers, AI Solutions Lead, HiveMQ,
-Inc. <strong>Date:</strong> March 2026 <strong>Status:</strong> Internal
-strategy document — not for external distribution
-<strong>Context:</strong> Synthesizes an external ChatGPT technical
-review into a concrete committee positioning strategy</p>
-</blockquote>
-<hr />
-<h2 id="the-strategic-problem">1. The Strategic Problem</h2>
-<p>The label “MQTT 6.0” is, by itself, a near-fatal framing for an OASIS
-TC submission. Major version numbers carry a specific meaning in
-standards bodies: breaking changes, years of TC work, ecosystem-wide
-migration costs, and competitive fragmentation while the draft is in
-flight. The OASIS MQTT TC spent roughly four years taking MQTT 5.0 from
-proposal to ratification. Asking the committee to open a “6.0” track is
-asking them to sign up for another four years — before they have read a
-single sentence of the proposal.</p>
-<p>This resistance is not irrational. MQTT 5.0 was explicitly designed
-with User Properties, an extensible property ID space, and a reserved
-property range precisely to enable future extensions <em>without</em>
-requiring a version bump. Members of the TC will read “MQTT 6.0” and
-their first question will be: “Why couldn’t this be done with User
-Properties and a profile?” If the answer to that question is not
-airtight, the proposal dies in the first review session.</p>
-<p>The external review is correct: the current framing triggers maximum
-TC resistance before the technical merit of the proposal gets a fair
-hearing. The fix is not to improve the technical arguments — those are
-already solid, as the rebuttals document demonstrates — it is to change
-the frame entirely so the committee evaluates the proposal on its merits
-rather than its version number.</p>
-<hr />
-<h2 id="the-reframe-two-track-positioning">2. The Reframe: Two-Track
-Positioning</h2>
-<p>The core insight from the external review is that the proposal
-contains two separable things that should be presented through two
-separate lenses:</p>
-<p><strong>Track 1 — For OASIS TC submission:</strong> Position the
-proposal as the <strong>MQTT Reliable Secure Streams Profile
-(MQTT-RSSP)</strong> — an interoperability profile fully compatible with
-MQTT 3.1.1 and MQTT 5.0, requiring no changes to the broker wire
-protocol, implemented via User Properties and payload conventions that
-any conformant MQTT 5.0 broker can forward without modification.</p>
-<p><strong>Track 2 — For HiveMQ product:</strong> The broker-side
-extensions — native <code>$queue/</code> persistence, Virtual FETCH
-enforcement, SQMC consumer mode arbitration, and Epoch management — are
-HiveMQ’s above-and-beyond implementation of the profile. They are not
-required for MQTT-RSSP profile conformance; they are value-added broker
-behaviors that HiveMQ ships as a competitive differentiator.</p>
-<p>This two-track structure maps directly onto the existing lift
-documents. The “application layer profile” in Option A and Option C is
-exactly MQTT-RSSP. The MQTT 6.0 transport extension spec becomes the
-HiveMQ-specific broker optimization layer. What gets submitted to OASIS
-is the profile; what HiveMQ ships as a product is the native broker
-support for that profile.</p>
-<p>The framing shift is not cosmetic. Under the MQTT-RSSP frame:</p>
-<ul>
-<li>A client running MQTT-RSSP on a Mosquitto broker today — using only
-User Properties and payload conventions — is a conformant
-implementation</li>
-<li>A client running MQTT-RSSP on HiveMQ with native
-<code>$queue/</code> support gets better performance, lower latency, and
-stronger durability guarantees — but is still running the same
-profile</li>
-<li>The TC is being asked to ratify an interoperability spec for a
-pattern that already exists in production (Sparkplug B sequence numbers,
-application-layer idempotency tables, session resume logic), not to
-approve a new protocol version</li>
-</ul>
-<p><strong>The compatibility statement to include in every
-document:</strong></p>
-<blockquote>
-<p>“This profile introduces no changes to the MQTT wire protocol and is
-fully interoperable with existing MQTT 3.1.1 and MQTT 5.0 brokers.”</p>
-</blockquote>
-<p>That single sentence removes approximately 70% of the standard
-committee objections before the technical review begins.</p>
-<hr />
-<h2 id="answering-the-two-fatal-questions">3. Answering the Two Fatal
-Questions</h2>
-<p>Two questions will be raised in the first TC review session. If they
-are not answered concisely and confidently, they become blockers that
-derail the entire proposal. Do not bury the answers in appendices — put
-them in the abstract.</p>
-<h3 id="q1-why-isnt-tls-already-sufficient">Q1: “Why isn’t TLS already
-sufficient?”</h3>
-<p>TLS protects the transport hop — client to broker to subscriber. It
-terminates at the broker. In a multi-tenant cloud broker, a federated
-bridge deployment, or any infrastructure where the broker is operated by
-a third party, TLS provides no protection against the broker itself. The
-broker decrypts, reads, re-encrypts, and forwards. For semiconductor
-equipment vendors shipping process recipes to tools on a customer’s
-factory floor, the cloud broker IS an attacker surface — not a
-hypothetical one, a contractual one: the broker operator’s SLA
-explicitly disclaims liability for payload content.</p>
-<p>MQTT-RSSP payload encryption (Properties 0x3A-0x3C) protects the data
-across the entire messaging lifecycle, not just the network path. The
-broker forwards an opaque payload with metadata. It cannot read process
-parameters, safety-critical commands, or proprietary control sequences.
-The pattern is precise: TLS = network confidentiality; MQTT-RSSP = data
-confidentiality. TLS and MQTT-RSSP are complementary, not redundant.</p>
-<h3 id="q2-who-manages-the-keys">Q2: “Who manages the keys?”</h3>
-<p>The profile defines only how encrypted payloads reference keys: a
-<code>key_id</code>, an <code>algorithm</code> identifier, and a
-<code>key_version</code>. Key distribution, rotation, and revocation are
-explicitly out of scope. Deployments integrate with whatever key
-management they already operate — device provisioning systems,
-enterprise PKI, HSMs, SPIFFE/SPIRE workload identity. The same design
-pattern as TLS SNI: the protocol references an identity, the PKI manages
-it. MQTT-RSSP does not introduce a new key management problem; it
-introduces a standard envelope for referencing keys from whatever system
-already manages them.</p>
-<hr />
-<h2 id="feature-by-feature-tc-positioning">4. Feature-by-Feature TC
-Positioning</h2>
-<p>Each feature needs a two-to-three sentence TC pitch that connects it
-to a concrete, documented ecosystem problem. Abstract arguments about
-reliability do not move standards committees; specific evidence of
-fragmentation does.</p>
-<p><strong>Stream Sequence Numbers (Property 0x30)</strong></p>
-<p>This standardizes the single most-reimplemented pattern in IIoT MQTT
-deployments. Every Eclipse Sparkplug B deployment already implements a
-64-bit <code>seq</code> field in protobuf payloads for exactly this
-purpose — gap detection and ordered delivery. MQTT-RSSP moves the
-sequence number from a payload-embedded convention into a standard
-envelope property so any client library can implement it once,
-interoperably, without a custom serialization format.</p>
-<p><strong>Stream Epoch (Property 0x35)</strong></p>
-<p>A simple replay protection mechanism across device restarts and
-broker failovers, analogous to TLS session tickets. The Epoch is a
-monotonically increasing uint16 that subscribers use to detect and
-discard stale replays and to know when their local idempotency state is
-no longer valid. It requires no broker coordination beyond incrementing
-a counter on state discontinuity events; a single-node Mosquitto
-instance can implement it correctly. Zero broker architecture changes
-required.</p>
-<p><strong>Payload Encryption (Properties 0x3A-0x3C)</strong></p>
-<p>Three optional User Properties constitute a broker-transparent
-encrypted envelope. No broker changes. No key material in the protocol.
-Solves the multi-tenant broker trust problem that every large industrial
-MQTT customer has raised independently — the problem that today forces
-them to implement ad-hoc payload encryption with no standard
-key-reference format, making interoperability between equipment vendors
-impossible.</p>
-<p><strong>SQMC (Single-Queue Multi-Consumer)</strong></p>
-<p>This is the most controversial feature; it must be framed carefully.
-Do not present it as a QoS replacement. Present it as application-level
-verifiable delivery confirmation for safety-critical command streams.
-MQTT QoS 1 and QoS 2 guarantee delivery semantics at the transport
-layer. SQMC provides cryptographic proof — via the sequence number and
-acknowledgment protocol — that the correct subscriber received and
-validated the correct message. This is required for SECS/GEM S2F21
-process start command handshakes, IEC 61850 grid protection relay
-sequences, and other safety-critical applications where “I sent it and
-the broker said OK” is not a sufficient guarantee.</p>
-<hr />
-<h2 id="what-to-avoid-saying">5. What to Avoid Saying</h2>
-<p>Language matters in TC submissions. Certain phrases activate
-pattern-matching against past standards failures and produce reflexive
-resistance before the technical argument is heard. For each phrase to
-avoid, there is a preferred alternative that conveys the same technical
-content without the political cost.</p>
-<table>
-<colgroup>
-<col style="width: 50%" />
-<col style="width: 50%" />
-</colgroup>
-<thead>
-<tr>
-<th>Avoid</th>
-<th>Use instead</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>“MQTT 6.0”</td>
-<td>“MQTT Reliable Secure Streams Profile (MQTT-RSSP)”</td>
-</tr>
-<tr>
-<td>“major protocol revision”</td>
-<td>“interoperability profile”</td>
-</tr>
-<tr>
-<td>“new packet type”</td>
-<td>“payload convention / User Property extension”</td>
-</tr>
-<tr>
-<td>“breaking change”</td>
-<td>“additive, opt-in extension”</td>
-</tr>
-<tr>
-<td>“broker encryption support”</td>
-<td>“broker-transparent security”</td>
-</tr>
-<tr>
-<td>“we need a new version”</td>
-<td>“we are standardizing patterns already in production”</td>
-</tr>
-<tr>
-<td>“replaces MQTT 5.0 features”</td>
-<td>“complements existing MQTT 5.0 semantics”</td>
-</tr>
-</tbody>
-</table>
-<p>The last two are particularly important. The argument “we are
-standardizing patterns already in production” is both true and
-persuasive: Sparkplug B sequence numbers, application-layer idempotency
-tables, and session resume logic are in production at scale today.
-MQTT-RSSP is a standardization of existing practice, not a proposal to
-change practice.</p>
-<hr />
-<h2 id="relationship-to-existing-lift-documents">6. Relationship to
-Existing Lift Documents</h2>
-<p>The MQTT-RSSP reframe maps cleanly onto the lift document structure.
-Under the Option C architecture:</p>
-<ul>
-<li><p><strong>MQTT 6.0 transport extension</strong> (broker
-obligations: Property 0x30/0x35 assignment, <code>$queue/</code>
-persistence, Virtual FETCH enforcement, SQMC arbitration) becomes the
-HiveMQ product layer — the above-and-beyond broker implementation that
-makes everything work natively, but is not required for profile
-conformance.</p></li>
-<li><p><strong>MQTT Stream 1.0 application protocol</strong> (client
-obligations: gap detection state machine, epoch resync procedure,
-high-watermark persistence, exactly-once workflow) becomes the normative
-content of the MQTT-RSSP OASIS submission.</p></li>
-</ul>
-<p>In other words: what gets submitted to OASIS is essentially the MQTT
-Stream 1.0 spec from lift-option-c, rebranded as MQTT-RSSP and framed as
-a profile over MQTT 5.0 rather than a layer above MQTT 6.0. The
-broker-side primitive requirements (Property 0x30 assignment,
-<code>$queue/</code> persistence) become SHOULD/RECOMMENDED behaviors
-for brokers that wish to natively support MQTT-RSSP, rather than MUST
-requirements for a new protocol level.</p>
-<p>This is not a retreat from the technical proposal. The technical
-content is identical. The OASIS submission surface is dramatically
-smaller, the risk profile for TC reviewers is dramatically lower, and
-the path to ratification is dramatically shorter.</p>
-<hr />
-<h2 id="estimated-tc-acceptance-probability">7. Estimated TC Acceptance
-Probability</h2>
-<p>Based on the external review’s assessment and the positioning
-analysis above:</p>
-<table>
-<colgroup>
-<col style="width: 33%" />
-<col style="width: 33%" />
-<col style="width: 33%" />
-</colgroup>
-<thead>
-<tr>
-<th>Framing</th>
-<th>Acceptance Probability</th>
-<th>Why</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>“MQTT 6.0 protocol revision”</td>
-<td>~10-15%</td>
-<td>Triggers maximum resistance before technical merit is heard; implies
-breaking changes, years of TC work, and ecosystem disruption; competes
-with TC members’ investment in MQTT 5.0</td>
-</tr>
-<tr>
-<td>“MQTT Reliable Secure Streams Profile (MQTT-RSSP)”</td>
-<td>~50-70%</td>
-<td>Profile framing signals low risk; broker transparency removes
-ecosystem disruption concerns; standardizing documented fragmentation
-(Sparkplug, ad-hoc sequence numbers) is a recognized TC mandate</td>
-</tr>
-</tbody>
-</table>
-<p>The delta between these two outcomes is not in the technical proposal
-— the proposal is sound in either frame. The delta is entirely in how
-the TC perceives its own workload and risk exposure. MQTT-RSSP asks the
-TC to ratify an interoperability profile for patterns already in
-production. MQTT 6.0 asks the TC to approve a new protocol version.
-These are structurally different asks with structurally different
-acceptance rates.</p>
-<p>The ~50-70% range under MQTT-RSSP framing is conditional on answering
-the two fatal questions (TLS sufficiency, key management) concisely in
-the abstract, and on keeping the payload encryption feature clearly
-marked as optional. If SQMC is submitted as a separate follow-on
-proposal rather than bundled in the initial submission, the acceptance
-probability for the core profile (Stream Sequence + Epoch + payload
-encryption envelope) likely rises above 70%.</p>
-<hr />
-<h2 id="recommended-next-steps">8. Recommended Next Steps</h2>
-<ol type="1">
-<li><p><strong>Rename all external-facing documents</strong> to use
-“MQTT-RSSP” or “MQTT Reliable Secure Streams Profile” as the primary
-identifier. Keep “MQTT 6.0” as a parenthetical for internal reference
-only.</p></li>
-<li><p><strong>Add the compatibility statement</strong> (“This profile
-introduces no changes to the MQTT wire protocol…”) to the abstract or
-first paragraph of every document intended for TC review.</p></li>
-<li><p><strong>Prepend the TLS question answer</strong> to the executive
-summary before the feature list. TC reviewers will ask it; answer it
-before they need to.</p></li>
-<li><p><strong>Consider a two-phase submission</strong>: Phase 1 covers
-Stream Sequence Numbers, Stream Epoch, and the payload encryption
-envelope (the broker-transparent features). Phase 2 covers SQMC. The
-Phase 1 submission has a cleaner “broker transparency” story and a
-higher acceptance probability. SQMC requires broker-side enforcement and
-is the most controversial feature; letting Phase 1 establish credibility
-before introducing it is strategically sound.</p></li>
-<li><p><strong>Align the lift documents</strong>: Update
-lift-option-c.md to reflect that “MQTT Stream 1.0” IS the MQTT-RSSP
-OASIS submission. The naming should be consistent before the TC review
-package is assembled.</p></li>
-</ol>
 </body>
 </html>
