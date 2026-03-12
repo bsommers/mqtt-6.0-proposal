@@ -30,6 +30,16 @@
 12. [Technical Pitfalls & Mitigations](critiques-and-rebuttals.md#technical-pitfalls)
 13. [Performance Analysis: High-Volume & DEP Scale](performance-analysis.md)
 14. [Critical Analyses: Security, OT SRE, and Protocol Design](critical-analyses.md)
+15. [SQMC vs. HiveMQ Declared Shared Subscriptions](sqmc-vs-declared-shared-subscriptions.md)
+
+### Application Layer Lift
+15. [The Lift — Overview & Feature Split](lift-overview.md)
+16. [Option A: Slim Protocol + MQTT Stream Application Profile](lift-option-a.md)
+17. [Option B: Protocol Spec + Normative Annex A](lift-option-b.md)
+18. [Option C: Two Independent Specifications](lift-option-c.md)
+
+### Standards Committee Strategy
+19. [TC Positioning Strategy — MQTT-RSSP Reframe & Acceptance Playbook](tc-positioning-strategy.md)
 
 ### Reference Implementations
 14. [Python v6.0 Shim (`gmqtt`)](../src/python/mqtt_v6_shim.py)

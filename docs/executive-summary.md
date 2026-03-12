@@ -20,7 +20,7 @@ MQTT v5.0 is excellent for lightweight telemetry and command delivery. However, 
 - **Push-only delivery.** The broker pushes all messages to consumers as fast as they arrive. A slow consumer cannot apply backpressure without complex out-of-band coordination.
 - **Session-bound queues.** Messages are only held for a client while its session exists. There is no way to create a durable queue that outlives client connections.
 - **Loose shared subscription semantics.** MQTT's `$share/` mechanism provides load balancing but lacks strict exclusive-consumer and message-locking semantics needed for transactional processing.
-- **No cluster-aware consistency.** When a HiveMQ node fails and a client reconnects to a new node, the protocol has no mechanism to detect what was lost or resume from an exact point.
+- **No cluster-aware consistency.** When a broker node fails and a client reconnects to a new node, the protocol has no mechanism to detect what was lost or resume from an exact point.
 
 These gaps are currently "solved" by embedding sequence numbers, idempotency keys, and acknowledgment logic in message payloads — a non-standard, non-interoperable approach.
 
@@ -28,13 +28,13 @@ These gaps are currently "solved" by embedding sequence numbers, idempotency key
 
 ## The Solution
 
-MQTT v6.0 introduces five targeted additions to the protocol, all backward-compatible with existing v5.0 parsers:
+MQTT v6.0 introduces five targeted additions to the protocol. In compatibility mode (Track B), these additions use v5.0 User Properties and control topics that are transparent to existing parsers. In native mode (Track A, Protocol Level 6), a new packet type (FETCH) and new property IDs are introduced that require updated client libraries and brokers:
 
 ### 1. 32-bit Stream Sequence Numbers
 A new Property (`0x30`) carrying a monotonic, cluster-wide 32-bit integer is attached to every message in the `$queue/` namespace. This allows consumers to detect gaps (`received Seq 1002 but expected 1001`), perform deduplication, and implement application-level exactly-once processing without embedding logic in payloads.
 
 ### 2. Stream Epoch
-A new Property (`0x35`) that tracks the "era" of a queue. When a HiveMQ cluster suffers a catastrophic failure and cannot guarantee sequence continuity, the Epoch is incremented. Consumers that detect an Epoch change know they must discard local idempotency state and re-synchronize — analogous to a SECS/GEM Establish Communications (S1F13) reset.
+A new Property (`0x35`) that tracks the "era" of a queue. When a broker cluster suffers a catastrophic failure and cannot guarantee sequence continuity, the Epoch is incremented. Consumers that detect an Epoch change know they must discard local idempotency state and re-synchronize — analogous to a SECS/GEM Establish Communications (S1F13) reset.
 
 ### 3. Named Durable Queues (`$queue/` namespace)
 Topics prefixed with `$queue/` are treated as first-class queue entities: persisted to non-volatile storage, sequenced, and retained indefinitely until consumed or expired — independent of any client session. This replaces the implicit, session-bound queue model of v5.0.
@@ -42,7 +42,10 @@ Topics prefixed with `$queue/` are treated as first-class queue entities: persis
 ### 4. Pull-Based Flow Control (FETCH)
 A new `FETCH` Control Packet (Type 16) lets consumers explicitly request batches of messages from the broker. The broker holds messages in the persistent queue and releases them only when asked. This eliminates the "thundering herd" problem where a recovering consumer is flooded with backlogged messages. For v5.0-compat environments, a Virtual FETCH mechanism uses a `$SYS/` control topic instead.
 
-### 5. Single-Queue Multi-Consumer (SQMC) Semantics
+### 5. Mandatory TLS 1.3 + Optional Payload Encryption (Zero Trust)
+Native Mode v6.0 connections MUST use TLS 1.3, eliminating the vulnerable cipher suites and additional round-trip latency of TLS 1.2. For deployments where the broker must be treated as an untrusted intermediary (zero trust architectures), v6.0 introduces three optional key metadata properties (`0x3A` Key ID, `0x3B` Algorithm, `0x3C` Key Version) that allow end-to-end encrypted payloads to carry the information consumers need to decrypt them — without placing any key material in the protocol. Key management (distribution, rotation, revocation) is explicitly an application-layer responsibility. This feature is entirely opt-in; deployments using TLS 1.3 transport encryption alone are fully conformant.
+
+### 6. Single-Queue Multi-Consumer (SQMC) Semantics
 An extension to `SUBSCRIBE` that adds two new consumer modes beyond the loose `$share/` model:
 - **Competing:** Messages are distributed to exactly one consumer via round-robin, with strict message locking and immediate failover if the consumer disconnects before acknowledging.
 - **Exclusive:** One designated consumer receives all messages; others are hot standbys that take over instantly on failure, preserving strict ordering.
@@ -56,7 +59,7 @@ An extension to `SUBSCRIBE` that adds two new consumer modes beyond the loose `$
 | Semiconductor FAB (SECS/GEM) | Broker restart can silently lose a "Process Start" (S2F21) command, ruining a wafer | Epoch resync + sequence gaps ensure the command is detected as lost and retried |
 | Industrial FDC Data Collection | High-frequency sensor data floods the host system, causing crashes | FETCH-based backpressure keeps the broker as the buffer; host processes at its own rate |
 | Financial Message Bus | Duplicate processing of payment events due to lack of idempotency primitives | 32-bit Sequence as an idempotency key, checked before executing business logic |
-| Multi-node HiveMQ Cluster | Client failover to a new node silently re-delivers or loses messages | Last Received Seq in CONNECT allows new node to resume delivery from exact position |
+| Multi-node Broker Cluster | Client failover to a new node silently re-delivers or loses messages | Last Received Seq in CONNECT allows new node to resume delivery from exact position |
 | High-availability IoT Gateways | Primary/backup consumer logic must be hand-coded in application layer | Exclusive consumer mode with automatic hot-standby failover built into the protocol |
 
 ---
@@ -67,18 +70,26 @@ MQTT v6.0 is backward-compatible with MQTT v5.0 for all unchanged v5.0 use cases
 
 Compatibility is not wire-transparent for v6.0-only features (FETCH, `$queue/`, Stream Sequence properties, `last-seq`/`epoch`); those require either Protocol Level 6 or the specified v5.0 compatibility mode. Specifically:
 
-- All new properties use IDs in the reserved range (`0x30–0x45`) that v5.0 brokers and clients are required to ignore — no harm to v5.0 peers.
+- All new properties use IDs in the currently unassigned range (`0x30–0x45`). The v5.0 spec requires conformant implementations to ignore unknown property IDs, so these properties are safe in mixed environments. However, these IDs are not formally reserved for v6.0 until an OASIS submission is accepted — a pre-standardization risk that the Compatibility Layer (User Properties) mitigates.
 - The `$queue/` namespace is ACL-protected; v5.0 clients that have not completed the v6.0 handshake are rejected.
 - A **Compatibility Layer** maps every native v6.0 feature to v5.0 User Properties and system topics, enabling mixed-version deployments.
 - A negotiation handshake (`mqtt-ext: v6.0` in CONNECT/CONNACK) allows clients and brokers to detect v6.0 support and fall back gracefully.
 
 **The key guarantee:** if you do not use `$queue/`, FETCH, or Stream Sequence properties, your deployment is fully compatible with v5.0 — no behavioral changes, no additional overhead, no migration required. See [Compatibility Boundaries](motivation.md#compatibility-boundaries) for the full scenario matrix.
 
+Security considerations for the new primitives — including ACL requirements for `$queue/`, Epoch integrity, sequence number side-channels, and High-Watermark persistence — are defined normatively in Section 7 of the [specification](spec/mqtt-v6.0-spec.md#7-security-considerations).
+
 ---
 
-## Implementation Path for HiveMQ
+## Scope and Standardization Path
 
-The broker-side implementation uses the HiveMQ Extension SDK:
+This proposal is intentionally scoped to a single problem domain: adding durable, ordered queuing primitives for industrial broker-tier use cases. It does not attempt to replace general-purpose message queues, add stream processing, or modify MQTT's core pub/sub semantics. The features are additive and opt-in.
+
+The recommended standardization path is **layered**: submit the core primitives (Stream Sequence, Epoch, `$queue/` namespace) as a first submission, with FETCH and SQMC as follow-on extensions if the core is accepted. This allows the committee to evaluate the proposal incrementally.
+
+## Reference Implementation Path (HiveMQ)
+
+A reference implementation can be built using the HiveMQ Extension SDK:
 
 | Feature | HiveMQ API |
 |---------|-----------|
