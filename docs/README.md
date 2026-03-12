@@ -30,6 +30,7 @@
 12. [Technical Pitfalls & Mitigations](critiques-and-rebuttals.md#technical-pitfalls)
 13. [Performance Analysis: High-Volume & DEP Scale](performance-analysis.md)
 14. [Critical Analyses: Security, OT SRE, and Protocol Design](critical-analyses.md)
+15. [SQMC vs. HiveMQ Declared Shared Subscriptions](sqmc-vs-declared-shared-subscriptions.md)
 
 ### Application Layer Lift
 15. [The Lift — Overview & Feature Split](lift-overview.md)

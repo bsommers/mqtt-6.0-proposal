@@ -1,11 +1,14 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<html xmlns="http://www.w3.org/1999/xhtml">
 <head>
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>MQTT Version 6.0 Proposal</title>
+  <title>MQTT Version 6.0 Proposal – executive-summary</title>
   <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
     code{white-space: pre-wrap;}
     span.smallcaps{font-variant: small-caps;}
     div.columns{display: flex; gap: min(4vw, 1.5em);}
@@ -25,9 +28,6 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.min.css" />
 </head>
 <body>
-<header id="title-block-header">
-<h1 class="title">MQTT Version 6.0 Proposal</h1>
-</header>
 <nav id="TOC" role="doc-toc">
 <ul>
 <li><a href="#executive-summary-mqtt-version-6.0"
@@ -49,8 +49,11 @@ id="toc-named-durable-queues-queue-namespace">3. Named Durable Queues
 <li><a href="#pull-based-flow-control-fetch"
 id="toc-pull-based-flow-control-fetch">4. Pull-Based Flow Control
 (FETCH)</a></li>
+<li><a href="#mandatory-tls-1.3-optional-payload-encryption-zero-trust"
+id="toc-mandatory-tls-1.3-optional-payload-encryption-zero-trust">5.
+Mandatory TLS 1.3 + Optional Payload Encryption (Zero Trust)</a></li>
 <li><a href="#single-queue-multi-consumer-sqmc-semantics"
-id="toc-single-queue-multi-consumer-sqmc-semantics">5. Single-Queue
+id="toc-single-queue-multi-consumer-sqmc-semantics">6. Single-Queue
 Multi-Consumer (SQMC) Semantics</a></li>
 </ul></li>
 <li><a href="#business-impact" id="toc-business-impact">Business
@@ -242,6 +245,12 @@ Side-Channel</a></li>
 <li><a href="#high-watermark-persistence"
 id="toc-high-watermark-persistence">7.4 High-Watermark
 Persistence</a></li>
+<li><a href="#transport-security-tls-1.3-requirement"
+id="toc-transport-security-tls-1.3-requirement">7.5 Transport Security —
+TLS 1.3 Requirement</a></li>
+<li><a href="#optional-payload-encryption-zero-trust"
+id="toc-optional-payload-encryption-zero-trust">7.6 Optional Payload
+Encryption (Zero Trust)</a></li>
 </ul></li>
 <li><a href="#annex-a-secsgem-mapping"
 id="toc-annex-a-secsgem-mapping">Annex A: SECS/GEM Mapping</a>
@@ -328,6 +337,70 @@ Not a Durable Queue</a></li>
 <li><a href="#design-decision-matrix" id="toc-design-decision-matrix">7.
 Design Decision Matrix</a></li>
 </ul></li>
+<li><a
+href="#mqtt-v6.0-addressing-criticisms-and-defending-the-proposal"
+id="toc-mqtt-v6.0-addressing-criticisms-and-defending-the-proposal">MQTT
+v6.0 — Addressing Criticisms and Defending the Proposal</a>
+<ul>
+<li><a href="#a-note-on-where-this-comes-from"
+id="toc-a-note-on-where-this-comes-from">A Note on Where This Comes
+From</a>
+<ul>
+<li><a href="#why-standardize-now-not-ship-an-extension-first"
+id="toc-why-standardize-now-not-ship-an-extension-first">Why Standardize
+Now — Not “Ship an Extension First”</a></li>
+</ul></li>
+<li><a href="#what-this-proposal-is-not"
+id="toc-what-this-proposal-is-not">What This Proposal Is Not</a></li>
+<li><a href="#mqtt-v5.0-already-does-this-point-by-point"
+id="toc-mqtt-v5.0-already-does-this-point-by-point">“MQTT v5.0 Already
+Does This” — Point-by-Point</a>
+<ul>
+<li><a href="#section-2.1-thats-a-shared-subscription"
+id="toc-section-2.1-thats-a-shared-subscription">Section 2.1: “That’s a
+Shared Subscription”</a></li>
+<li><a href="#section-2.2-packet-identifiers-and-message-ordering"
+id="toc-section-2.2-packet-identifiers-and-message-ordering">Section
+2.2: Packet Identifiers and Message Ordering</a></li>
+<li><a href="#section-2.3-receive-maximum-already-provides-flow-control"
+id="toc-section-2.3-receive-maximum-already-provides-flow-control">Section
+2.3: “Receive Maximum Already Provides Flow Control”</a></li>
+<li><a href="#section-2.4-cluster-aware-sequence-numbers-on-the-epoch"
+id="toc-section-2.4-cluster-aware-sequence-numbers-on-the-epoch">Section
+2.4: “Cluster-Aware Sequence Numbers” — On the Epoch</a></li>
+<li><a
+href="#section-2.5-shared-subscription-semantics-exclusive-consumer-hot-standby"
+id="toc-section-2.5-shared-subscription-semantics-exclusive-consumer-hot-standby">Section
+2.5: Shared Subscription Semantics — Exclusive Consumer / Hot
+Standby</a></li>
+</ul></li>
+<li><a href="#this-should-be-handled-at-the-application-level"
+id="toc-this-should-be-handled-at-the-application-level">“This Should Be
+Handled at the Application Level”</a>
+<ul>
+<li><a href="#what-i-have-seen-in-customer-deployments"
+id="toc-what-i-have-seen-in-customer-deployments">What I Have Seen in
+Customer Deployments</a></li>
+<li><a href="#the-historical-precedent"
+id="toc-the-historical-precedent">The Historical Precedent</a></li>
+</ul></li>
+<li><a href="#do-you-think-mqtt-should-be-a-message-queue"
+id="toc-do-you-think-mqtt-should-be-a-message-queue">“Do You Think MQTT
+Should Be a Message Queue?”</a>
+<ul>
+<li><a href="#my-direct-answer" id="toc-my-direct-answer">My Direct
+Answer</a></li>
+<li><a href="#why-not-kafka-the-answer-that-never-changes"
+id="toc-why-not-kafka-the-answer-that-never-changes">Why Not Kafka (The
+Answer That Never Changes)</a></li>
+</ul></li>
+<li><a href="#too-much-how-not-enough-what-and-why"
+id="toc-too-much-how-not-enough-what-and-why">“Too Much HOW, Not Enough
+WHAT and WHY”</a></li>
+<li><a href="#summary-of-responses"
+id="toc-summary-of-responses">Summary of Responses</a></li>
+<li><a href="#references" id="toc-references">References</a></li>
+</ul></li>
 <li><a href="#critical-perspectives-rebuttals-technical-pitfalls"
 id="toc-critical-perspectives-rebuttals-technical-pitfalls">Critical
 Perspectives, Rebuttals &amp; Technical Pitfalls</a>
@@ -413,69 +486,42 @@ Topics</a></li>
 <li><a href="#summary-risk-matrix" id="toc-summary-risk-matrix">Summary:
 Risk Matrix</a></li>
 </ul></li>
-<li><a
-href="#mqtt-v6.0-addressing-criticisms-and-defending-the-proposal"
-id="toc-mqtt-v6.0-addressing-criticisms-and-defending-the-proposal">MQTT
-v6.0 — Addressing Criticisms and Defending the Proposal</a>
+<li><a href="#mqtt-v6.0-performance-analysis-high-volume-use-cases"
+id="toc-mqtt-v6.0-performance-analysis-high-volume-use-cases">MQTT v6.0
+Performance Analysis: High-Volume Use Cases</a>
 <ul>
-<li><a href="#a-note-on-where-this-comes-from"
-id="toc-a-note-on-where-this-comes-from">A Note on Where This Comes
-From</a>
+<li><a href="#workload-profile" id="toc-workload-profile">1. Workload
+Profile</a></li>
+<li><a href="#performance-bottlenecks-in-the-current-proposal"
+id="toc-performance-bottlenecks-in-the-current-proposal">2. Performance
+Bottlenecks in the Current Proposal</a>
 <ul>
-<li><a href="#why-standardize-now-not-ship-an-extension-first"
-id="toc-why-standardize-now-not-ship-an-extension-first">Why Standardize
-Now — Not “Ship an Extension First”</a></li>
+<li><a href="#cas-counter-contention-at-scale"
+id="toc-cas-counter-contention-at-scale">2.1 CAS Counter Contention at
+Scale</a></li>
+<li><a href="#high-watermark-inadequacy-under-burst"
+id="toc-high-watermark-inadequacy-under-burst">2.2 High-Watermark
+Inadequacy Under Burst</a></li>
+<li><a href="#quorum-write-latency-vs.-real-time-telemetry"
+id="toc-quorum-write-latency-vs.-real-time-telemetry">2.3 Quorum Write
+Latency vs. Real-Time Telemetry</a></li>
+<li><a href="#fetch-batch-size-tuning-for-burst-recovery"
+id="toc-fetch-batch-size-tuning-for-burst-recovery">2.4 FETCH Batch Size
+Tuning for Burst Recovery</a></li>
+<li><a href="#rate-limiting-granularity"
+id="toc-rate-limiting-granularity">2.5 Rate Limiting
+Granularity</a></li>
+<li><a href="#epoch-reset-thundering-herd"
+id="toc-epoch-reset-thundering-herd">2.6 Epoch Reset Thundering
+Herd</a></li>
 </ul></li>
-<li><a href="#what-this-proposal-is-not"
-id="toc-what-this-proposal-is-not">What This Proposal Is Not</a></li>
-<li><a href="#mqtt-v5.0-already-does-this-point-by-point"
-id="toc-mqtt-v5.0-already-does-this-point-by-point">“MQTT v5.0 Already
-Does This” — Point-by-Point</a>
-<ul>
-<li><a href="#section-2.1-thats-a-shared-subscription"
-id="toc-section-2.1-thats-a-shared-subscription">Section 2.1: “That’s a
-Shared Subscription”</a></li>
-<li><a href="#section-2.2-packet-identifiers-and-message-ordering"
-id="toc-section-2.2-packet-identifiers-and-message-ordering">Section
-2.2: Packet Identifiers and Message Ordering</a></li>
-<li><a href="#section-2.3-receive-maximum-already-provides-flow-control"
-id="toc-section-2.3-receive-maximum-already-provides-flow-control">Section
-2.3: “Receive Maximum Already Provides Flow Control”</a></li>
-<li><a href="#section-2.4-cluster-aware-sequence-numbers-on-the-epoch"
-id="toc-section-2.4-cluster-aware-sequence-numbers-on-the-epoch">Section
-2.4: “Cluster-Aware Sequence Numbers” — On the Epoch</a></li>
-<li><a
-href="#section-2.5-shared-subscription-semantics-exclusive-consumer-hot-standby"
-id="toc-section-2.5-shared-subscription-semantics-exclusive-consumer-hot-standby">Section
-2.5: Shared Subscription Semantics — Exclusive Consumer / Hot
-Standby</a></li>
-</ul></li>
-<li><a href="#this-should-be-handled-at-the-application-level"
-id="toc-this-should-be-handled-at-the-application-level">“This Should Be
-Handled at the Application Level”</a>
-<ul>
-<li><a href="#what-i-have-seen-in-customer-deployments"
-id="toc-what-i-have-seen-in-customer-deployments">What I Have Seen in
-Customer Deployments</a></li>
-<li><a href="#the-historical-precedent"
-id="toc-the-historical-precedent">The Historical Precedent</a></li>
-</ul></li>
-<li><a href="#do-you-think-mqtt-should-be-a-message-queue"
-id="toc-do-you-think-mqtt-should-be-a-message-queue">“Do You Think MQTT
-Should Be a Message Queue?”</a>
-<ul>
-<li><a href="#my-direct-answer" id="toc-my-direct-answer">My Direct
-Answer</a></li>
-<li><a href="#why-not-kafka-the-answer-that-never-changes"
-id="toc-why-not-kafka-the-answer-that-never-changes">Why Not Kafka (The
-Answer That Never Changes)</a></li>
-</ul></li>
-<li><a href="#too-much-how-not-enough-what-and-why"
-id="toc-too-much-how-not-enough-what-and-why">“Too Much HOW, Not Enough
-WHAT and WHY”</a></li>
-<li><a href="#summary-of-responses"
-id="toc-summary-of-responses">Summary of Responses</a></li>
-<li><a href="#references" id="toc-references">References</a></li>
+<li><a href="#updated-property-table" id="toc-updated-property-table">3.
+Updated Property Table</a></li>
+<li><a href="#namespace-additions" id="toc-namespace-additions">4.
+Namespace Additions</a></li>
+<li><a href="#summary-adaptations-for-dep-scale"
+id="toc-summary-adaptations-for-dep-scale">5. Summary: Adaptations for
+DEP Scale</a></li>
 </ul></li>
 <li><a href="#critical-analyses-of-mqtt-v6.0"
 id="toc-critical-analyses-of-mqtt-v6.0">Critical Analyses of MQTT
@@ -534,6 +580,252 @@ Alternative</a></li>
 </ul></li>
 <li><a href="#summary-comparison" id="toc-summary-comparison">Summary
 Comparison</a></li>
+</ul></li>
+<li><a href="#sqmc-vs.-hivemq-declared-shared-subscriptions"
+id="toc-sqmc-vs.-hivemq-declared-shared-subscriptions">SQMC vs. HiveMQ
+Declared Shared Subscriptions</a>
+<ul>
+<li><a href="#what-declared-shared-subscriptions-does"
+id="toc-what-declared-shared-subscriptions-does">What Declared Shared
+Subscriptions Does</a></li>
+<li><a href="#the-gaps" id="toc-the-gaps">The Gaps</a></li>
+<li><a href="#the-critical-gap-mqtt-4.8.2-5"
+id="toc-the-critical-gap-mqtt-4.8.2-5">The Critical Gap:
+<code>[MQTT-4.8.2-5]</code></a></li>
+<li><a href="#the-exclusive-consumer-gap"
+id="toc-the-exclusive-consumer-gap">The Exclusive Consumer Gap</a></li>
+<li><a
+href="#why-declared-shared-subscriptions-is-the-argument-not-the-counterargument"
+id="toc-why-declared-shared-subscriptions-is-the-argument-not-the-counterargument">Why
+Declared Shared Subscriptions Is the Argument, Not the
+Counterargument</a></li>
+<li><a href="#summary" id="toc-summary">Summary</a></li>
+</ul></li>
+<li><a href="#the-application-layer-lift-overview"
+id="toc-the-application-layer-lift-overview">The Application Layer Lift
+— Overview</a>
+<ul>
+<li><a href="#the-core-insight" id="toc-the-core-insight">The Core
+Insight</a></li>
+<li><a href="#the-split-protocol-vs.-application-layer"
+id="toc-the-split-protocol-vs.-application-layer">The Split: Protocol
+vs. Application Layer</a>
+<ul>
+<li><a href="#protocol-layer-broker-obligations-mqtt-6.0-spec"
+id="toc-protocol-layer-broker-obligations-mqtt-6.0-spec">Protocol Layer
+— Broker Obligations (MQTT 6.0 Spec)</a></li>
+<li><a href="#application-layer-client-library-obligations-the-lift"
+id="toc-application-layer-client-library-obligations-the-lift">Application
+Layer — Client Library Obligations (“The Lift”)</a></li>
+</ul></li>
+<li><a href="#why-this-answers-the-committee"
+id="toc-why-this-answers-the-committee">Why This Answers the
+Committee</a></li>
+<li><a href="#three-options" id="toc-three-options">Three
+Options</a></li>
+<li><a href="#recommendation-1"
+id="toc-recommendation-1">Recommendation</a></li>
+</ul></li>
+<li><a
+href="#option-a-mqtt-6.0-protocol-primitives-mqtt-stream-application-profile"
+id="toc-option-a-mqtt-6.0-protocol-primitives-mqtt-stream-application-profile">Option
+A: MQTT 6.0 Protocol Primitives + MQTT Stream Application Profile</a>
+<ul>
+<li><a href="#overview" id="toc-overview">1. Overview</a></li>
+<li><a
+href="#the-protocol-layer-what-stays-in-the-mqtt-6.0-specification"
+id="toc-the-protocol-layer-what-stays-in-the-mqtt-6.0-specification">2.
+The Protocol Layer: What Stays in the MQTT 6.0 Specification</a></li>
+<li><a href="#the-application-profile-layer-the-lift"
+id="toc-the-application-profile-layer-the-lift">3. The Application
+Profile Layer: The Lift</a></li>
+<li><a href="#how-this-addresses-committee-criticisms"
+id="toc-how-this-addresses-committee-criticisms">4. How This Addresses
+Committee Criticisms</a>
+<ul>
+<li><a href="#simons-muxing-criticism"
+id="toc-simons-muxing-criticism">Simon’s “mux’ing” criticism</a></li>
+<li><a href="#the-this-should-be-application-level-argument"
+id="toc-the-this-should-be-application-level-argument">The “this should
+be application-level” argument</a></li>
+<li><a href="#the-bloat-and-kafka-clone-criticism"
+id="toc-the-bloat-and-kafka-clone-criticism">The “bloat” and Kafka-clone
+criticism</a></li>
+<li><a href="#the-standardize-now-vs.-extension-first-tension"
+id="toc-the-standardize-now-vs.-extension-first-tension">The
+“standardize now vs. extension first” tension</a></li>
+</ul></li>
+<li><a href="#feature-split-comprehensive-reference-table"
+id="toc-feature-split-comprehensive-reference-table">5. Feature Split:
+Comprehensive Reference Table</a></li>
+<li><a href="#standardization-path" id="toc-standardization-path">6.
+Standardization Path</a></li>
+<li><a href="#trade-offs" id="toc-trade-offs">7. Trade-offs</a>
+<ul>
+<li><a href="#advantages" id="toc-advantages">Advantages</a></li>
+<li><a href="#disadvantages"
+id="toc-disadvantages">Disadvantages</a></li>
+</ul></li>
+<li><a href="#references-1" id="toc-references-1">References</a></li>
+</ul></li>
+<li><a
+href="#option-b-mqtt-6.0-with-normative-client-annex-explicit-layer-boundary"
+id="toc-option-b-mqtt-6.0-with-normative-client-annex-explicit-layer-boundary">Option
+B: MQTT 6.0 with Normative Client Annex — Explicit Layer Boundary</a>
+<ul>
+<li><a href="#overview-1" id="toc-overview-1">1. Overview</a>
+<ul>
+<li><a href="#the-problem-with-the-current-spec-structure"
+id="toc-the-problem-with-the-current-spec-structure">The Problem With
+the Current Spec Structure</a></li>
+<li><a href="#the-option-b-solution" id="toc-the-option-b-solution">The
+Option B Solution</a></li>
+</ul></li>
+<li><a href="#proposed-spec-restructure"
+id="toc-proposed-spec-restructure">2. Proposed Spec Restructure</a>
+<ul>
+<li><a
+href="#sections-17-broker-normative-unchanged-scope-tightened-audience"
+id="toc-sections-17-broker-normative-unchanged-scope-tightened-audience">Sections
+1–7 (Broker Normative — Unchanged Scope, Tightened Audience)</a></li>
+<li><a
+href="#annex-a-normative-stream-client-implementation-requirements"
+id="toc-annex-a-normative-stream-client-implementation-requirements">Annex
+A (Normative) — Stream Client Implementation Requirements</a></li>
+<li><a href="#annex-b-informative-implementation-examples"
+id="toc-annex-b-informative-implementation-examples">Annex B
+(Informative) — Implementation Examples</a></li>
+</ul></li>
+<li><a href="#annex-a-content-what-gets-lifted"
+id="toc-annex-a-content-what-gets-lifted">3. Annex A Content: What Gets
+Lifted</a>
+<ul>
+<li><a href="#a.1-stream-consumer-state-machine"
+id="toc-a.1-stream-consumer-state-machine">A.1 Stream Consumer State
+Machine</a></li>
+<li><a href="#a.2-gap-detection" id="toc-a.2-gap-detection">A.2 Gap
+Detection</a></li>
+<li><a href="#a.3-high-watermark-management"
+id="toc-a.3-high-watermark-management">A.3 High-Watermark
+Management</a></li>
+<li><a href="#a.4-epoch-change-protocol"
+id="toc-a.4-epoch-change-protocol">A.4 Epoch Change Protocol</a></li>
+<li><a href="#a.5-reconnect-and-resume"
+id="toc-a.5-reconnect-and-resume">A.5 Reconnect and Resume</a></li>
+<li><a href="#a.6-fetch-pacing-strategy"
+id="toc-a.6-fetch-pacing-strategy">A.6 FETCH Pacing Strategy</a></li>
+<li><a href="#a.7-idempotency-table-lifecycle"
+id="toc-a.7-idempotency-table-lifecycle">A.7 Idempotency Table
+Lifecycle</a></li>
+<li><a href="#a.8-sequence-wraparound"
+id="toc-a.8-sequence-wraparound">A.8 Sequence Wraparound</a></li>
+</ul></li>
+<li><a href="#how-this-addresses-committee-criticisms-1"
+id="toc-how-this-addresses-committee-criticisms-1">4. How This Addresses
+Committee Criticisms</a>
+<ul>
+<li><a href="#simons-muxing-criticism-1"
+id="toc-simons-muxing-criticism-1">Simon’s “Mux’ing” Criticism</a></li>
+<li><a href="#the-application-level-argument"
+id="toc-the-application-level-argument">The “Application-Level”
+Argument</a></li>
+<li><a href="#procedural-argument"
+id="toc-procedural-argument">Procedural Argument</a></li>
+<li><a href="#the-bloat-criticism" id="toc-the-bloat-criticism">The
+“Bloat” Criticism</a></li>
+</ul></li>
+<li><a href="#comparison-current-spec-vs.-option-b-structure"
+id="toc-comparison-current-spec-vs.-option-b-structure">5. Comparison:
+Current Spec vs. Option B Structure</a></li>
+<li><a href="#trade-offs-1" id="toc-trade-offs-1">6. Trade-offs</a>
+<ul>
+<li><a href="#pros-4" id="toc-pros-4">Pros</a></li>
+<li><a href="#cons-4" id="toc-cons-4">Cons</a></li>
+</ul></li>
+<li><a
+href="#what-the-main-body-sections-17-looks-like-after-restructure"
+id="toc-what-the-main-body-sections-17-looks-like-after-restructure">7.
+What the Main Body (Sections 1–7) Looks Like After Restructure</a></li>
+<li><a href="#references-2" id="toc-references-2">References</a></li>
+</ul></li>
+<li><a
+href="#option-c-two-independent-specifications-mqtt-6.0-transport-extension-mqtt-stream-1.0-application-protocol"
+id="toc-option-c-two-independent-specifications-mqtt-6.0-transport-extension-mqtt-stream-1.0-application-protocol">Option
+C: Two Independent Specifications — MQTT 6.0 Transport Extension + MQTT
+Stream 1.0 Application Protocol</a>
+<ul>
+<li><a href="#overview-2" id="toc-overview-2">1. Overview</a></li>
+<li><a href="#mqtt-6.0-transport-extension-specification"
+id="toc-mqtt-6.0-transport-extension-specification">2. MQTT 6.0
+Transport Extension Specification</a>
+<ul>
+<li><a href="#what-mqtt-6.0-defines" id="toc-what-mqtt-6.0-defines">2.1
+What MQTT 6.0 Defines</a></li>
+<li><a href="#what-mqtt-6.0-explicitly-does-not-define"
+id="toc-what-mqtt-6.0-explicitly-does-not-define">2.2 What MQTT 6.0
+Explicitly Does NOT Define</a></li>
+</ul></li>
+<li><a href="#mqtt-stream-1.0-application-protocol-specification"
+id="toc-mqtt-stream-1.0-application-protocol-specification">3. MQTT
+Stream 1.0 Application Protocol Specification</a>
+<ul>
+<li><a href="#stream-consumer-state-machine"
+id="toc-stream-consumer-state-machine">3.1 Stream Consumer State
+Machine</a></li>
+<li><a href="#gap-detection-protocol"
+id="toc-gap-detection-protocol">3.2 Gap Detection Protocol</a></li>
+<li><a href="#epoch-resync-protocol" id="toc-epoch-resync-protocol">3.3
+Epoch Resync Protocol</a></li>
+<li><a href="#high-watermark-protocol"
+id="toc-high-watermark-protocol">3.4 High-Watermark Protocol</a></li>
+<li><a href="#exactly-once-delivery-contract"
+id="toc-exactly-once-delivery-contract">3.5 Exactly-Once Delivery
+Contract</a></li>
+<li><a href="#fetch-pacing" id="toc-fetch-pacing">3.6 FETCH
+Pacing</a></li>
+<li><a href="#reconnect-protocol" id="toc-reconnect-protocol">3.7
+Reconnect Protocol</a></li>
+<li><a href="#sequence-wraparound-rules"
+id="toc-sequence-wraparound-rules">3.8 Sequence Wraparound
+Rules</a></li>
+<li><a href="#sqmc-application-patterns"
+id="toc-sqmc-application-patterns">3.9 SQMC Application
+Patterns</a></li>
+</ul></li>
+<li><a href="#how-this-addresses-committee-criticisms-2"
+id="toc-how-this-addresses-committee-criticisms-2">4. How This Addresses
+Committee Criticisms</a>
+<ul>
+<li><a href="#simons-muxing-criticism-2"
+id="toc-simons-muxing-criticism-2">4.1 Simon’s “Mux’ing”
+Criticism</a></li>
+<li><a href="#the-this-should-be-application-level-argument-1"
+id="toc-the-this-should-be-application-level-argument-1">4.2 The “This
+Should Be Application-Level” Argument</a></li>
+<li><a href="#the-bloat-kafka-clone-criticism"
+id="toc-the-bloat-kafka-clone-criticism">4.3 The “Bloat / Kafka Clone”
+Criticism</a></li>
+<li><a href="#the-standardize-now-vs.-extension-first-argument"
+id="toc-the-standardize-now-vs.-extension-first-argument">4.4 The
+“Standardize Now vs. Extension First” Argument</a></li>
+<li><a href="#property-id-conflict-risk"
+id="toc-property-id-conflict-risk">4.5 Property ID Conflict
+Risk</a></li>
+</ul></li>
+<li><a href="#governance-split" id="toc-governance-split">5. Governance
+Split</a></li>
+<li><a href="#interoperability-contract"
+id="toc-interoperability-contract">6. Interoperability Contract</a></li>
+<li><a href="#trade-offs-2" id="toc-trade-offs-2">7. Trade-offs</a>
+<ul>
+<li><a href="#advantages-1" id="toc-advantages-1">Advantages</a></li>
+<li><a href="#disadvantages-1"
+id="toc-disadvantages-1">Disadvantages</a></li>
+</ul></li>
+<li><a href="#analogues-in-other-protocol-ecosystems"
+id="toc-analogues-in-other-protocol-ecosystems">8. Analogues in Other
+Protocol Ecosystems</a></li>
+<li><a href="#references-3" id="toc-references-3">References</a></li>
 </ul></li>
 </ul>
 </nav>
@@ -635,7 +927,20 @@ eliminates the “thundering herd” problem where a recovering consumer is
 flooded with backlogged messages. For v5.0-compat environments, a
 Virtual FETCH mechanism uses a <code>$SYS/</code> control topic
 instead.</p>
-<h3 id="single-queue-multi-consumer-sqmc-semantics">5. Single-Queue
+<h3 id="mandatory-tls-1.3-optional-payload-encryption-zero-trust">5.
+Mandatory TLS 1.3 + Optional Payload Encryption (Zero Trust)</h3>
+<p>Native Mode v6.0 connections MUST use TLS 1.3, eliminating the
+vulnerable cipher suites and additional round-trip latency of TLS 1.2.
+For deployments where the broker must be treated as an untrusted
+intermediary (zero trust architectures), v6.0 introduces three optional
+key metadata properties (<code>0x3A</code> Key ID, <code>0x3B</code>
+Algorithm, <code>0x3C</code> Key Version) that allow end-to-end
+encrypted payloads to carry the information consumers need to decrypt
+them — without placing any key material in the protocol. Key management
+(distribution, rotation, revocation) is explicitly an application-layer
+responsibility. This feature is entirely opt-in; deployments using TLS
+1.3 transport encryption alone are fully conformant.</p>
+<h3 id="single-queue-multi-consumer-sqmc-semantics">6. Single-Queue
 Multi-Consumer (SQMC) Semantics</h3>
 <p>An extension to <code>SUBSCRIBE</code> that adds two new consumer
 modes beyond the loose <code>$share/</code> model: -
@@ -2243,6 +2548,11 @@ consumers in the group using round-robin or least-loaded assignment. The
 specific algorithm is implementation-defined.</li>
 <li><strong>Normative:</strong> Each message MUST be delivered to
 exactly one consumer in a Competing Consumer group.</li>
+<li><strong>Normative:</strong> When dispatching a message in Competing
+Consumer mode, the Broker MUST include all message properties —
+including payload encryption properties (<code>0x3A</code>,
+<code>0x3B</code>, <code>0x3C</code>) — unchanged in the PUBLISH
+delivered to the consumer.</li>
 </ul>
 <h4 id="exclusive-consumer-mode">4.4.2 Exclusive Consumer Mode</h4>
 <p>When a consumer subscribes with
@@ -2257,6 +2567,11 @@ Broker MUST immediately promote the first Standby to Primary and resume
 delivery from the last acknowledged sequence.</li>
 <li><strong>Ordering guarantee:</strong> Because only one consumer is
 ever active, strict ordering is preserved across failover.</li>
+<li><strong>Normative:</strong> When delivering a message to the Primary
+Consumer in Exclusive mode, the Broker MUST include all message
+properties — including payload encryption properties (<code>0x3A</code>,
+<code>0x3B</code>, <code>0x3C</code>) — unchanged in the PUBLISH
+packet.</li>
 </ul>
 <hr />
 <h2 id="summary-of-changes-v5.0-vs.-v6.0">5. Summary of Changes: v5.0
@@ -2486,6 +2801,216 @@ client could report a false High-Watermark to skip messages. Deployments
 requiring tamper-proof watermark tracking SHOULD implement server-side
 watermark validation.</li>
 </ul>
+<h3 id="transport-security-tls-1.3-requirement">7.5 Transport Security —
+TLS 1.3 Requirement</h3>
+<p><strong>[NEW for v6.0]</strong></p>
+<ul>
+<li><strong>Normative:</strong> A v6.0 Broker operating in Native Mode
+(Protocol Level 6) MUST support TLS 1.3 as defined in RFC 8446. A v6.0
+Client in Native Mode MUST NOT negotiate TLS versions prior to TLS 1.3
+with a v6.0 Broker.</li>
+<li><strong>Normative:</strong> A v6.0 Broker MUST reject connections
+from clients that offer only TLS 1.2 or earlier cipher suites when
+operating in Native Mode. Reason Code <code>0x87 (Not Authorized)</code>
+is returned.</li>
+<li><strong>Normative:</strong> The following TLS 1.3 cipher suites MUST
+be supported: <code>TLS_AES_256_GCM_SHA384</code>,
+<code>TLS_CHACHA20_POLY1305_SHA256</code>. Brokers MAY support
+additional cipher suites.</li>
+<li><strong>Informative:</strong> TLS 1.3 eliminates the handshake
+round-trip latency of TLS 1.2 and removes vulnerable cipher suites (RC4,
+3DES, CBC-mode AES without HMAC). For industrial deployments where both
+latency and auditability matter, TLS 1.3 is the appropriate floor.</li>
+<li><strong>Compatibility Note:</strong> In Compatibility Mode (Protocol
+Level 5), TLS 1.3 is RECOMMENDED but NOT required. Existing v5.0
+deployments may use TLS 1.2 during migration. Operators SHOULD establish
+a migration timeline when upgrading to Native Mode.</li>
+</ul>
+<h3 id="optional-payload-encryption-zero-trust">7.6 Optional Payload
+Encryption (Zero Trust)</h3>
+<p><strong>[NEW for v6.0 — OPTIONAL FEATURE]</strong></p>
+<blockquote>
+<p><strong>Note:</strong> This feature is entirely optional. It is never
+required for protocol conformance. Deployments that rely on TLS 1.3
+transport encryption alone (Section 7.5) are fully conformant. Payload
+encryption is provided for zero trust architectures where the broker
+must be treated as an untrusted intermediary.</p>
+</blockquote>
+<h4 id="motivation">7.6.1 Motivation</h4>
+<p>In zero trust architectures, end-to-end confidentiality requires that
+the broker — even a trusted HiveMQ cluster — cannot read message
+payloads. TLS 1.3 secures the transport hop (client→broker,
+broker→subscriber) but terminates at the broker. Payload encryption
+extends confidentiality across the broker, making the broker a sealed
+transport for ciphertext it cannot inspect.</p>
+<p>This matters specifically for <code>$queue/</code> topics carrying
+sensitive industrial payloads (SECS/GEM process recipes, financial
+transactions, regulated health or grid data) where the broker operator
+and the data owner are organizationally distinct.</p>
+<h4 id="new-properties-for-key-metadata">7.6.2 New Properties for Key
+Metadata</h4>
+<p>Three new optional properties carry encryption metadata on PUBLISH
+packets. These properties describe the encryption applied to the
+payload. They carry no key material — key distribution is an
+application-layer responsibility outside this specification.</p>
+<table>
+<colgroup>
+<col style="width: 32%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 35%" />
+</colgroup>
+<thead>
+<tr>
+<th>Property ID</th>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x3A</code></td>
+<td><strong>Payload Key ID</strong></td>
+<td>UTF-8 String</td>
+<td>Opaque identifier for the symmetric key used to encrypt the payload.
+Consumers use this to look up the correct decryption key from their key
+management system.</td>
+</tr>
+<tr>
+<td><code>0x3B</code></td>
+<td><strong>Payload Algorithm</strong></td>
+<td>Byte</td>
+<td>Enum identifying the encryption algorithm. See Section 7.6.3.</td>
+</tr>
+<tr>
+<td><code>0x3C</code></td>
+<td><strong>Payload Key Version</strong></td>
+<td>Two Byte Integer</td>
+<td>Key rotation counter. Consumers can detect key rotation events
+without changing the Key ID.</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Normative:</strong> Encryption properties
+(<code>0x3A</code>, <code>0x3B</code>, <code>0x3C</code>) MUST only
+appear on PUBLISH packets to <code>$queue/</code> topics carrying
+encrypted payloads. A PUBLISH to a non-<code>$queue/</code> topic
+carrying these properties is malformed. Brokers MAY reject such packets
+with Reason Code <code>0x8A (Invalid Argument)</code>.</li>
+<li><strong>Normative:</strong> A Broker that receives a PUBLISH with
+encryption properties MUST forward them to subscribers unchanged. The
+Broker MUST NOT attempt to decrypt or re-encrypt payloads.</li>
+</ul>
+<h4 id="payload-algorithm-enum-property-0x3b">7.6.3 Payload Algorithm
+Enum (Property <code>0x3B</code>)</h4>
+<table>
+<colgroup>
+<col style="width: 28%" />
+<col style="width: 44%" />
+<col style="width: 28%" />
+</colgroup>
+<thead>
+<tr>
+<th>Value</th>
+<th>Algorithm</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x01</code></td>
+<td>AES-256-GCM</td>
+<td>Recommended default; AEAD; authenticated encryption</td>
+</tr>
+<tr>
+<td><code>0x02</code></td>
+<td>ChaCha20-Poly1305</td>
+<td>Preferred for constrained clients without AES hardware
+acceleration</td>
+</tr>
+<tr>
+<td><code>0x03</code></td>
+<td>AES-128-GCM</td>
+<td>Acceptable where bandwidth or compute is constrained</td>
+</tr>
+<tr>
+<td><code>0x7F</code></td>
+<td>Implementation-Defined</td>
+<td>For private extensions; not interoperable across broker vendors</td>
+</tr>
+</tbody>
+</table>
+<h4 id="nonce-and-authentication-tag">7.6.4 Nonce and Authentication
+Tag</h4>
+<p>When using an AEAD cipher (all standardized algorithms above), the
+encrypted payload format is:</p>
+<pre><code>[12-byte nonce][ciphertext][16-byte authentication tag]</code></pre>
+<p>The nonce MUST be unique per message. Implementations SHOULD derive
+the nonce by combining a random base with the Stream Sequence Number
+(<code>0x30</code>) to prevent nonce reuse across queue messages while
+remaining deterministic for deduplication.</p>
+<h4 id="key-management-application-layer-boundary">7.6.5 Key Management
+— Application Layer Boundary</h4>
+<p>Key distribution, key rotation procedures, key revocation, and
+certificate management are <strong>application-layer
+responsibilities</strong>. This specification defines only the metadata
+properties that identify which key and algorithm were used. How keys are
+exchanged, stored, and rotated is intentionally outside this
+specification.</p>
+<blockquote>
+<p>Refer to the MQTT Stream Application Profile (Option A in the
+Application Layer Lift documentation) for recommended key management
+patterns, including integration with SPIFFE/SPIRE for workload identity
+and HPKE for asymmetric key encapsulation.</p>
+</blockquote>
+<h4 id="broker-behavior-for-encrypted-payloads">7.6.6 Broker Behavior
+for Encrypted Payloads</h4>
+<ul>
+<li><strong>Normative:</strong> A Broker MUST NOT reject a PUBLISH
+solely because it carries payload encryption properties
+(<code>0x3A</code>, <code>0x3B</code>, <code>0x3C</code>).</li>
+<li><strong>Normative:</strong> A Broker MUST forward payload encryption
+properties to all matching subscribers unchanged.</li>
+<li><strong>Normative:</strong> A Broker MUST NOT log, inspect, or cache
+the decrypted payload content. The broker is a sealed conduit for
+encrypted payloads.</li>
+<li><strong>Informative:</strong> Because the broker cannot inspect
+encrypted payloads, content-based routing (topic-based filtering on
+payload content), stream processing plugins, and payload-aware QoS
+features are unavailable for encrypted <code>$queue/</code> messages.
+Topic design must carry all routing information in the topic string
+rather than in the payload.</li>
+</ul>
+<h4 id="interaction-with-stream-sequence-numbers">7.6.7 Interaction with
+Stream Sequence Numbers</h4>
+<p>Stream Sequence Numbers (<code>0x30</code>) are assigned to the
+encrypted payload as a whole. The sequence number does not depend on
+plaintext content. Gap detection, high-watermark tracking, and epoch
+resync operate identically whether the payload is encrypted or not — all
+sequence semantics are in the MQTT properties layer, not the
+payload.</p>
+<h4 id="backward-compatibility-with-mqtt-v5.0-clients">7.6.8 Backward
+Compatibility with MQTT v5.0 Clients</h4>
+<p><strong>Normative:</strong> MQTT v5.0 clients MUST NOT be exposed to
+encrypted payloads on <code>$queue/</code> topics. The v6.0 handshake
+gate (Section 3.1) is the primary enforcement mechanism: a client that
+has not completed the <code>mqtt-ext: v6.0</code> negotiation MUST be
+rejected with Reason Code <code>0x87 (Not Authorized)</code> when
+attempting to SUBSCRIBE to any <code>$queue/</code> topic. Since v5.0
+clients do not send the <code>mqtt-ext: v6.0</code> User Property in
+CONNECT, they cannot pass this gate and will never receive encrypted
+payloads.</p>
+<p><strong>Informative:</strong> In the event that a conformant MQTT
+v5.0 client inadvertently receives a PUBLISH packet carrying encryption
+properties (<code>0x3A</code>, <code>0x3B</code>, <code>0x3C</code>),
+the MQTT v5.0 specification mandates that the client silently ignore
+unknown property IDs. No protocol-level error or connection closure is
+triggered. Any failure is at the application layer (the client receives
+ciphertext it cannot interpret), not at the protocol layer. This
+provides a defense-in-depth guarantee: the handshake gate is the primary
+protection; the unknown-property rule is the fallback.</p>
 <hr />
 <h2 id="annex-a-secsgem-mapping">Annex A: SECS/GEM Mapping</h2>
 <p>For semiconductor manufacturing environments using SECS/GEM (SEMI
@@ -3048,460 +3573,6 @@ namespace.</p>
 a full MQTT v6.0 ecosystem. Compatibility Layer (Reserved Props) for
 transitional deployments. Pure User Props shim for proof-of-concept and
 testing only.</p>
-<h1 id="critical-perspectives-rebuttals-technical-pitfalls">Critical
-Perspectives, Rebuttals &amp; Technical Pitfalls</h1>
-<p>This document provides an honest assessment of the MQTT v6.0 proposal
-from multiple perspectives: MQTT standards committee members, IoT
-architects, software engineers, and SREs. For each criticism, a rebuttal
-and/or mitigation is provided.</p>
-<hr />
-<h2 id="part-1-standards-committee-architecture-critique">Part 1:
-Standards Committee &amp; Architecture Critique</h2>
-<h3
-id="criticism-1-mqtts-success-is-its-simplicity.-v6.0-turns-it-into-a-bloated-kafka-clone.">Criticism
-1: “MQTT’s success is its simplicity. v6.0 turns it into a bloated Kafka
-clone.”</h3>
-<p><strong>From:</strong> MQTT protocol purists, standards committee
-members</p>
-<p><strong>The Argument:</strong> MQTT succeeded precisely because it
-fits in 128KB of RAM and works on a microcontroller. By adding 32-bit
-sequencing, Epochs, persistent queues, and FETCH semantics, we are
-violating the core design principle. The protocol will lose its
-competitive advantage against AMQP and become yet another “enterprise
-messaging platform.”</p>
-<p><strong>Rebuttal:</strong></p>
-<ol type="1">
-<li><p><strong>“Context Isolation” Defense:</strong> These features are
-strictly opt-in. A temperature sensor publishing to
-<code>temperature/office</code> uses MQTT v6.0 identically to MQTT
-v3.1.1 — no sequence numbers, no epochs, no FETCH. The protocol grows
-upward, not outward. A compliant v6.0 client that doesn’t use
-<code>$queue/</code> is binary-indistinguishable from a v5.0
-client.</p></li>
-<li><p><strong>“Standardization of Hacks” Argument:</strong> Every major
-industrial MQTT deployment has already built these features — in the
-payload. Sequence IDs, idempotency keys, and consumer group logic are
-already in production payloads at industrial scale. v6.0 moves these
-de-facto requirements into the protocol header where brokers can
-optimize for them. The complexity exists; v6.0 just standardizes
-it.</p></li>
-<li><p><strong>Scope Comparison:</strong> The jump from v5.0 to v6.0 is
-smaller than the jump from v3.1.1 to v5.0. The v5.0 spec added
-Properties, Reason Codes, Shared Subscriptions, User Properties, and
-Will Delay — all of which “bloated” the protocol by the same argument.
-The ecosystem absorbed it; industrial users demanded it.</p></li>
-<li><p><strong>Standardize Early or Fragment Forever.</strong> The
-alternative — “ship it as a vendor extension first” — sounds prudent but
-leads to fragmentation. If HiveMQ ships <code>$queue/</code> as a
-proprietary extension, EMQX, Mosquitto, and AWS IoT Core will build
-incompatible versions. <code>$SYS/</code> is the cautionary tale: every
-broker implemented it differently, and it remains unstandardized 15
-years later. HiveMQ’s own <a
-href="https://docs.hivemq.com/hivemq/latest/user-guide/declared-shared-subscriptions.html">Declared
-Shared Subscriptions</a> are proof that extension-driven solutions do
-not converge on interoperability. Once three vendors have paying
-customers on incompatible implementations, the OASIS committee must
-reconcile three designs instead of evaluating one proposal — and
-standards processes stall for years. Standardizing before fragmentation
-is cheaper than standardizing after.</p></li>
-</ol>
-<hr />
-<h3
-id="criticism-2-the-queue-namespace-breaks-topic-hierarchy-semantics.">Criticism
-2: “The <code>$queue/</code> namespace breaks topic hierarchy
-semantics.”</h3>
-<p><strong>From:</strong> MQTT architects, broker implementers</p>
-<p><strong>The Argument:</strong> MQTT topics are flat strings with
-hierarchical separators. The <code>$</code> prefix convention is fragile
-— <code>$SYS/</code> is implementation-specific, <code>$share/</code> is
-standard but limited. Creating a new <code>$queue/</code> namespace adds
-confusion, may conflict with existing broker topic trees, and is a “soft
-break” for v5.0 brokers that might route or reject it incorrectly.</p>
-<p><strong>Rebuttal:</strong></p>
-<ol type="1">
-<li><p><strong>Existing precedent.</strong> The <code>$SYS/</code> and
-<code>$share/</code> namespaces already demonstrate that
-<code>$</code>-prefixed topics are an accepted mechanism for
-protocol-level semantics. <code>$queue/</code> follows the same
-pattern.</p></li>
-<li><p><strong>Explicit negotiation mitigates misrouting.</strong> The
-v6.0 handshake (Section 3.1 of the spec) requires clients to confirm
-broker v6.0 support before using <code>$queue/</code>. If the broker
-does not confirm, the client MUST NOT use <code>$queue/</code> —
-preventing silent misrouting.</p></li>
-<li><p><strong>ACL isolation.</strong> The spec mandates
-<code>$queue/</code> access be controlled via ACLs, just like
-<code>$SYS/</code>. A v5.0 broker that doesn’t understand
-<code>$queue/</code> will simply apply its default ACL policy
-(typically: reject <code>$</code>-prefixed topics from unprivileged
-clients), preventing message loss by failing loudly.</p></li>
-</ol>
-<p><strong>Remaining Risk:</strong> A misconfigured v5.0 broker with
-open ACLs COULD treat <code>$queue/foo</code> as a literal topic and
-accept publishes, creating a silent reliability hole.
-<strong>Mitigation:</strong> Document that <code>$queue/</code> topics
-MUST be ACL-blocked on v5.0 brokers.</p>
-<hr />
-<h3
-id="criticism-3-the-fetch-packet-type-16-is-a-hard-break-that-undermines-the-whole-compatible-story.">Criticism
-3: “The FETCH packet (Type 16) is a hard break that undermines the whole
-‘compatible’ story.”</h3>
-<p><strong>From:</strong> Standards committee, library maintainers</p>
-<p><strong>The Argument:</strong> Type 16 was reserved in v5.0
-specifically to indicate an error. A v5.0 broker receiving a Type 16
-packet MUST close the connection. In a heterogeneous environment with
-mixed v5.0 and v6.0 brokers, a single misrouted FETCH packet causes
-cascading disconnections.</p>
-<p><strong>Rebuttal:</strong></p>
-<ol type="1">
-<li><p><strong>The Compatibility Layer exists for this reason.</strong>
-The Virtual FETCH mechanism (Section 4.2.2) provides identical semantics
-using standard v5.0 PUBLISH packets. No environment is forced to use
-native FETCH.</p></li>
-<li><p><strong>Protocol-level negotiation prevents misrouting.</strong>
-A client sets Protocol Level 6 in CONNECT. A v5.0 broker will reject the
-connection at the CONNECT stage with
-<code>Reason Code 0x84 (Unsupported Protocol Version)</code> — before
-any FETCH packet is ever sent. The client then falls back to
-Compatibility Mode. There is no scenario where a FETCH packet reaches a
-v5.0 broker in a correctly implemented client.</p></li>
-<li><p><strong>Clean version separation.</strong> Having a Level 6 that
-is truly distinct from Level 5 is better long-term than a “v5.1” that
-silently extends in ways that break some brokers but not others. The
-break is explicit and managed.</p></li>
-</ol>
-<hr />
-<h2 id="part-2-software-engineering-performance-critique">Part 2:
-Software Engineering &amp; Performance Critique</h2>
-<h3
-id="criticism-4-the-original-proposals-leader-node-model-contradicts-hivemqs-masterless-architecture.">Criticism
-4: “The original proposal’s Leader Node model contradicts HiveMQ’s
-masterless architecture.”</h3>
-<p><strong>From:</strong> HiveMQ engineers, distributed systems
-architects</p>
-<p><strong>The Argument:</strong> The early draft proposed assigning a
-“Leader Node” per <code>$queue/</code> via consistent hashing, with all
-publishes routing through that node. HiveMQ is explicitly masterless —
-all nodes are peers, no consensus protocol (Raft/Paxos) is used, and no
-node “owns” a topic. The Leader Node model would require HiveMQ to
-fundamentally change its architecture.</p>
-<p><strong>Resolution (accepted — the proposal was
-updated):</strong></p>
-<p>This criticism is <strong>correct</strong>. The Leader Node model was
-removed from the specification in favour of a <strong>Distributed
-Sequence Counter</strong> approach that is native to HiveMQ’s actual
-architecture:</p>
-<ol type="1">
-<li><p><strong>Distributed Sequence Counter.</strong> Each
-<code>$queue/</code> maintains a single cluster-wide atomic counter in
-HiveMQ’s replication data grid. Any node can increment it atomically
-(compare-and-swap) to claim the next sequence number. No routing changes
-are required; any node handles any publish. HiveMQ’s existing data grid
-already provides the distributed primitives needed.</p></li>
-<li><p><strong>No leader election, no Raft/Paxos.</strong> The atomic
-counter replaces the entire leader/follower model. Split-brain
-sequencing (two nodes issuing the same Seq) is prevented by the CAS
-semantics of the counter, not by funneling all traffic through one
-node.</p></li>
-<li><p><strong>Epoch triggers change.</strong> Instead of “leader
-failover triggers Epoch++”, the trigger is “replication quorum loss” —
-i.e., when a network partition resolves and the counter’s replicated
-state cannot be verified. This maps directly to HiveMQ’s partition
-detection events, which the Extension SDK already exposes.</p></li>
-<li><p><strong>Hot-queue scaling still works.</strong> If a single
-<code>$queue/</code> becomes a throughput bottleneck, the correct
-mitigation is application-level sharding (<code>$queue/line_1_A</code>,
-<code>$queue/line_1_B</code>) — exactly as you would shard a Kafka topic
-into multiple partitions. The counter CAS overhead per message is
-negligible compared to the NVMe write latency.</p></li>
-</ol>
-<hr />
-<h3
-id="criticism-5-replication-lag-will-cause-data-loss-in-the-replication-gap-window.">Criticism
-5: “Replication lag will cause data loss in the replication gap
-window.”</h3>
-<p><strong>From:</strong> SREs, database engineers</p>
-<p><strong>The Argument:</strong> Node A received a publish and
-incremented the sequence counter to Seq 100, but crashes before the
-message is replicated to other nodes. Node B has no record of Seq 100. A
-client that was tracking Seq 100 will detect a gap, but the message is
-unrecoverable.</p>
-<p><strong>Rebuttal:</strong></p>
-<ol type="1">
-<li><p><strong>Quorum write prevents the gap.</strong> The spec requires
-the PUBACK to the publisher only after the message is confirmed on
-<code>N</code> replicas (configurable <code>Replication-Factor</code>).
-With <code>Replication-Factor: 2</code>, Node A crashing never loses the
-message because Node B already has it before the publisher received its
-PUBACK.</p></li>
-<li><p><strong>The atomic counter and quorum write are
-decoupled.</strong> The sequence number is claimed first (atomic CAS on
-the counter), then the message is written to quorum. If Node A crashes
-between those two steps, the claimed Seq number is “orphaned.” This
-creates a one-time gap. The Epoch does NOT need to increment in this
-case — the surviving cluster knows the gap exists and can communicate it
-to consumers when they request that sequence range.</p></li>
-<li><p><strong>Epoch for partition events only.</strong> Epoch
-increments only when the entire counter quorum is lost (partition event)
-— not for individual node crashes. This reduces spurious full-resyncs
-that would otherwise be triggered by routine node restarts.</p></li>
-<li><p><strong>The v5.0 baseline is worse.</strong> A v5.0 broker
-silently loses the message with no signal to the client. v6.0 makes the
-gap explicit, auditable, and recoverable at the application
-layer.</p></li>
-</ol>
-<hr />
-<h3
-id="criticism-6-persistent-queues-on-the-broker-will-cause-storage-bloat-and-operational-nightmares.">Criticism
-6: “Persistent queues on the broker will cause storage bloat and
-operational nightmares.”</h3>
-<p><strong>From:</strong> SREs, operations teams</p>
-<p><strong>The Argument:</strong> If every <code>$queue/</code> is
-persisted to non-volatile storage forever, brokers will eventually run
-out of disk space. “Leaked queues” (queues no one is reading) will
-accumulate indefinitely. This is an operational disaster in a
-long-running production system.</p>
-<p><strong>Rebuttal:</strong></p>
-<ol type="1">
-<li><p><strong>Mandatory TTL and max-size properties.</strong> The spec
-requires <code>v6-queue-ttl</code> (how long to hold the queue after
-last consumer disconnect) and <code>v6-queue-max-size</code> (message
-count limit). Both default to implementation-defined values but MUST be
-configurable. The spec also requires a “drop-oldest” or “reject-new”
-policy when limits are reached — no silent unbounded growth.</p></li>
-<li><p><strong>“Tiered Storage” implementation model.</strong>
-Production brokers (analogous to HiveMQ or Kafka) should implement
-hot/cold storage: recent messages in RAM (or NVMe), deep backlogs tiered
-to object storage (S3/GCS). The broker is a transient buffer with
-bounded local cost.</p></li>
-<li><p><strong>Operational observability.</strong> 32-bit sequences make
-“leaked queue” detection trivial: an SRE can query
-<code>MAX(Seq) - Last_Consumer_ACK_Seq</code> to calculate exact backlog
-depth per queue in real-time. This is far better than the current
-situation where session-bound queues silently accumulate with no tooling
-to measure them.</p></li>
-</ol>
-<hr />
-<h2 id="part-3-sre-operational-critique">Part 3: SRE &amp; Operational
-Critique</h2>
-<h3
-id="criticism-7-the-fetch-mechanism-adds-latency-compared-to-push-delivery.">Criticism
-7: “The FETCH mechanism adds latency compared to push delivery.”</h3>
-<p><strong>From:</strong> Performance engineers, real-time systems
-architects</p>
-<p><strong>The Argument:</strong> A FETCH round-trip adds 2× the one-way
-latency compared to a push delivery. For real-time applications, this is
-unacceptable.</p>
-<p><strong>Rebuttal:</strong></p>
-<ol type="1">
-<li><p><strong>Scope clarification.</strong> FETCH is exclusively for
-<code>$queue/</code> topics — durable industrial queues. Standard
-pub/sub topics (real-time sensor telemetry, command delivery to online
-devices) continue to use push delivery unchanged. The proposal does not
-change push semantics for non-queue topics.</p></li>
-<li><p><strong>Cost-benefit for industrial queues.</strong> In
-semiconductor FDC or financial messaging, “missing a message” is
-infinitely more expensive than 5ms of added latency. The FETCH mechanism
-prevents the host system from crashing under data spikes — which is the
-#1 cause of unplanned downtime in industrial MQTT deployments.</p></li>
-<li><p><strong>Long-polling mitigates latency for near-real-time
-queues.</strong> The <code>Wait Timeout</code> property in the FETCH
-packet enables long-polling: the broker holds the connection open and
-responds immediately when a new message arrives. Effective latency is
-near-zero for well-paced queues.</p></li>
-</ol>
-<hr />
-<h3
-id="criticism-8-custom-property-ids-in-the-reserved-range-could-conflict-with-future-oasis-standardization.">Criticism
-8: “Custom property IDs in the reserved range could conflict with future
-OASIS standardization.”</h3>
-<p><strong>From:</strong> Standards committee members, protocol
-engineers</p>
-<p><strong>The Argument:</strong> Properties
-<code>0x30</code>–<code>0x45</code> are currently unassigned in MQTT
-v5.0, but they could be assigned by a future OASIS revision. If v6.0
-squats on these IDs and a future v5.1/v6.x assigns different semantics
-to the same IDs, we have a compatibility disaster.</p>
-<p><strong>Rebuttal:</strong></p>
-<ol type="1">
-<li><p><strong>This is exactly why we need formal
-standardization.</strong> The solution to “these IDs might be assigned
-later” is to submit v6.0 to OASIS and have the IDs formally reserved.
-The alternative — using User Properties forever — permanently forecloses
-binary optimization.</p></li>
-<li><p><strong>The proposal is already in “draft OASIS” format.</strong>
-The spec is structured to be submitted as an OASIS draft. Early
-submission reserves the property IDs before any conflict can
-arise.</p></li>
-<li><p><strong>Interim risk is manageable.</strong> During the
-pre-standardization period, the Compatibility Layer (User Properties)
-can be used exclusively. The reserved property IDs are only activated in
-native v6.0 brokers that understand the spec. A v5.0 broker will
-silently ignore them, not misinterpret them.</p></li>
-</ol>
-<hr />
-<h2 id="technical-pitfalls">Technical Pitfalls</h2>
-<h3 id="pitfall-1-sequence-wraparound-at-232">Pitfall 1: Sequence
-Wraparound at 2^32</h3>
-<p><strong>Description:</strong> A 32-bit sequence number wraps around
-after 4,294,967,295 messages. A high-throughput queue generating 100,000
-messages/second exhausts the sequence space in ~43,000 seconds (~12
-hours).</p>
-<p><strong>Mitigation:</strong> - For high-throughput queues, the broker
-MUST handle wraparound gracefully by treating <code>Seq 0</code> after
-<code>Seq 0xFFFFFFFF</code> as a continuation (not a gap). - For
-disambiguation, wraparound can be coupled with an Epoch increment — a
-full 32-bit cycle increments the Epoch. This gives an effective 48-bit
-sequence space. - A future revision may introduce 64-bit sequences for
-ultra-high-throughput use cases (see Annex B of the spec).</p>
-<hr />
-<h3 id="pitfall-2-idempotency-table-growth">Pitfall 2: Idempotency Table
-Growth</h3>
-<p><strong>Description:</strong> Consumers maintaining a “processed
-messages” idempotency table (for exactly-once semantics) may grow the
-table unboundedly if sequence numbers are not garbage-collected.</p>
-<p><strong>Mitigation:</strong> - The High-Watermark model (store only
-the latest processed Seq) is sufficient for in-order delivery queues —
-O(1) storage. - Only out-of-order delivery (not expected from ordered
-<code>$queue/</code> topics) requires a full set-based idempotency
-table. - Epoch Resets provide natural garbage-collection boundaries: on
-Epoch change, discard the entire idempotency table.</p>
-<hr />
-<h3 id="pitfall-3-competing-consumer-fairness">Pitfall 3: Competing
-Consumer Fairness</h3>
-<p><strong>Description:</strong> Round-robin distribution may create
-consumer starvation if one consumer processes messages slowly. Slow
-consumers receive fewer messages but still hold “locks” on in-flight
-messages, blocking queue throughput.</p>
-<p><strong>Mitigation:</strong> - The spec allows brokers to implement
-“least-loaded” instead of strict round-robin: distribute the next
-message to the consumer with the fewest unacknowledged messages. - A
-per-consumer <code>Receive Maximum</code> limit (inherited from v5.0)
-caps the number of in-flight locks per consumer. - Consumers that are
-consistently slow should be flagged via broker metrics and operator
-intervention.</p>
-<hr />
-<h3 id="pitfall-4-epoch-reset-as-a-dos-vector">Pitfall 4: Epoch Reset as
-a DoS Vector</h3>
-<p><strong>Description:</strong> A compromised or misconfigured broker
-could send spurious Epoch Reset signals, causing all connected clients
-to discard their idempotency state and re-synchronize simultaneously — a
-thundering herd.</p>
-<p><strong>Mitigation:</strong> - The spec requires Epoch increments
-only when the broker cannot guarantee sequence continuity (Section
-4.3.2). Any other Epoch increment is a protocol violation. - Clients
-SHOULD implement Epoch change rate limiting: more than N Epoch changes
-per hour is anomalous and should trigger an alert and/or connection
-refusal. - Epoch changes MUST be logged with timestamps and node
-identifiers for forensic auditing.</p>
-<hr />
-<h3 id="pitfall-5-virtual-fetch-overhead-compat-mode">Pitfall 5: Virtual
-FETCH Overhead (Compat Mode)</h3>
-<p><strong>Description:</strong> The Virtual FETCH mechanism publishes a
-message to <code>$SYS/queues/{name}/fetch</code> and waits for the
-broker to respond with the batch. This is two round-trips per batch plus
-the overhead of the control topic publish.</p>
-<p><strong>Mitigation:</strong> - Use the <code>Wait Timeout</code> user
-property with long-polling to reduce idle round-trips. - For
-high-throughput applications, pipeline FETCH requests (send the next
-FETCH before the current batch is fully acknowledged). - This overhead
-is the explicit trade-off of Compatibility Mode. Native v6.0 FETCH
-eliminates it; operators should plan to migrate to Protocol Level 6 for
-production high-throughput deployments.</p>
-<hr />
-<h3
-id="pitfall-6-queue-namespace-collision-with-existing-topics">Pitfall 6:
-<code>$queue/</code> Namespace Collision with Existing Topics</h3>
-<p><strong>Description:</strong> Deployments that already use topic
-paths containing the string <code>queue</code> (e.g.,
-<code>myapp/queue/events</code>) may have topic tree management issues
-or operator confusion.</p>
-<p><strong>Mitigation:</strong> - The <code>$queue/</code> prefix begins
-with <code>$</code>, which is already a reserved character in MQTT
-(standard topics never start with <code>$</code>). No collision with
-user-defined topic spaces is possible. - Operator documentation should
-clearly distinguish <code>$queue/</code> (protocol-level named queues)
-from <code>myapp/queue/</code> (application-level topic paths).</p>
-<hr />
-<h2 id="summary-risk-matrix">Summary: Risk Matrix</h2>
-<table>
-<colgroup>
-<col style="width: 32%" />
-<col style="width: 16%" />
-<col style="width: 20%" />
-<col style="width: 30%" />
-</colgroup>
-<thead>
-<tr>
-<th>Criticism / Pitfall</th>
-<th>Severity</th>
-<th>Probability</th>
-<th>Mitigation Quality</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Type 16 breaks v5.0 brokers</td>
-<td>High</td>
-<td>High (mixed env)</td>
-<td>✅ Full (compat layer)</td>
-</tr>
-<tr>
-<td>Leader node model (removed)</td>
-<td>High</td>
-<td>Resolved</td>
-<td>✅ Full (distributed counter)</td>
-</tr>
-<tr>
-<td>Replication lag / data loss</td>
-<td>High</td>
-<td>Low (with quorum)</td>
-<td>✅ Good (epoch + quorum)</td>
-</tr>
-<tr>
-<td>Storage bloat</td>
-<td>Medium</td>
-<td>Medium</td>
-<td>✅ Good (TTL + limits)</td>
-</tr>
-<tr>
-<td>Sequence wraparound (32-bit)</td>
-<td>Low</td>
-<td>Low (normal scale)</td>
-<td>✅ Good (epoch cycle)</td>
-</tr>
-<tr>
-<td>Epoch Reset DoS</td>
-<td>Medium</td>
-<td>Low</td>
-<td>⚠️ Partial (rate limiting)</td>
-</tr>
-<tr>
-<td>SUBSCRIBE bits break v5.0</td>
-<td>High</td>
-<td>High (native mode)</td>
-<td>✅ Full (user props)</td>
-</tr>
-<tr>
-<td>Property ID conflict (OASIS)</td>
-<td>Medium</td>
-<td>Low</td>
-<td>✅ Good (formalize early)</td>
-</tr>
-<tr>
-<td>Idempotency table growth</td>
-<td>Low</td>
-<td>Low (ordered queue)</td>
-<td>✅ Good (high-watermark)</td>
-</tr>
-<tr>
-<td>Virtual FETCH overhead</td>
-<td>Low</td>
-<td>High (compat mode)</td>
-<td>⚠️ Partial (pipeline)</td>
-</tr>
-</tbody>
-</table>
 <h1 id="mqtt-v6.0-addressing-criticisms-and-defending-the-proposal">MQTT
 v6.0 — Addressing Criticisms and Defending the Proposal</h1>
 <blockquote>
@@ -4326,6 +4397,888 @@ href="https://www.hivemq.com/blog/building-industrial-iot-data-streaming-archite
 Industrial IoT Data Streaming with MQTT</a> — MQTT at industrial
 scale</li>
 </ul>
+<h1 id="critical-perspectives-rebuttals-technical-pitfalls">Critical
+Perspectives, Rebuttals &amp; Technical Pitfalls</h1>
+<p>This document provides an honest assessment of the MQTT v6.0 proposal
+from multiple perspectives: MQTT standards committee members, IoT
+architects, software engineers, and SREs. For each criticism, a rebuttal
+and/or mitigation is provided.</p>
+<hr />
+<h2 id="part-1-standards-committee-architecture-critique">Part 1:
+Standards Committee &amp; Architecture Critique</h2>
+<h3
+id="criticism-1-mqtts-success-is-its-simplicity.-v6.0-turns-it-into-a-bloated-kafka-clone.">Criticism
+1: “MQTT’s success is its simplicity. v6.0 turns it into a bloated Kafka
+clone.”</h3>
+<p><strong>From:</strong> MQTT protocol purists, standards committee
+members</p>
+<p><strong>The Argument:</strong> MQTT succeeded precisely because it
+fits in 128KB of RAM and works on a microcontroller. By adding 32-bit
+sequencing, Epochs, persistent queues, and FETCH semantics, we are
+violating the core design principle. The protocol will lose its
+competitive advantage against AMQP and become yet another “enterprise
+messaging platform.”</p>
+<p><strong>Rebuttal:</strong></p>
+<ol type="1">
+<li><p><strong>“Context Isolation” Defense:</strong> These features are
+strictly opt-in. A temperature sensor publishing to
+<code>temperature/office</code> uses MQTT v6.0 identically to MQTT
+v3.1.1 — no sequence numbers, no epochs, no FETCH. The protocol grows
+upward, not outward. A compliant v6.0 client that doesn’t use
+<code>$queue/</code> is binary-indistinguishable from a v5.0
+client.</p></li>
+<li><p><strong>“Standardization of Hacks” Argument:</strong> Every major
+industrial MQTT deployment has already built these features — in the
+payload. Sequence IDs, idempotency keys, and consumer group logic are
+already in production payloads at industrial scale. v6.0 moves these
+de-facto requirements into the protocol header where brokers can
+optimize for them. The complexity exists; v6.0 just standardizes
+it.</p></li>
+<li><p><strong>Scope Comparison:</strong> The jump from v5.0 to v6.0 is
+smaller than the jump from v3.1.1 to v5.0. The v5.0 spec added
+Properties, Reason Codes, Shared Subscriptions, User Properties, and
+Will Delay — all of which “bloated” the protocol by the same argument.
+The ecosystem absorbed it; industrial users demanded it.</p></li>
+<li><p><strong>Standardize Early or Fragment Forever.</strong> The
+alternative — “ship it as a vendor extension first” — sounds prudent but
+leads to fragmentation. If HiveMQ ships <code>$queue/</code> as a
+proprietary extension, EMQX, Mosquitto, and AWS IoT Core will build
+incompatible versions. <code>$SYS/</code> is the cautionary tale: every
+broker implemented it differently, and it remains unstandardized 15
+years later. HiveMQ’s own <a
+href="https://docs.hivemq.com/hivemq/latest/user-guide/declared-shared-subscriptions.html">Declared
+Shared Subscriptions</a> are proof that extension-driven solutions do
+not converge on interoperability. Once three vendors have paying
+customers on incompatible implementations, the OASIS committee must
+reconcile three designs instead of evaluating one proposal — and
+standards processes stall for years. Standardizing before fragmentation
+is cheaper than standardizing after.</p></li>
+</ol>
+<hr />
+<h3
+id="criticism-2-the-queue-namespace-breaks-topic-hierarchy-semantics.">Criticism
+2: “The <code>$queue/</code> namespace breaks topic hierarchy
+semantics.”</h3>
+<p><strong>From:</strong> MQTT architects, broker implementers</p>
+<p><strong>The Argument:</strong> MQTT topics are flat strings with
+hierarchical separators. The <code>$</code> prefix convention is fragile
+— <code>$SYS/</code> is implementation-specific, <code>$share/</code> is
+standard but limited. Creating a new <code>$queue/</code> namespace adds
+confusion, may conflict with existing broker topic trees, and is a “soft
+break” for v5.0 brokers that might route or reject it incorrectly.</p>
+<p><strong>Rebuttal:</strong></p>
+<ol type="1">
+<li><p><strong>Existing precedent.</strong> The <code>$SYS/</code> and
+<code>$share/</code> namespaces already demonstrate that
+<code>$</code>-prefixed topics are an accepted mechanism for
+protocol-level semantics. <code>$queue/</code> follows the same
+pattern.</p></li>
+<li><p><strong>Explicit negotiation mitigates misrouting.</strong> The
+v6.0 handshake (Section 3.1 of the spec) requires clients to confirm
+broker v6.0 support before using <code>$queue/</code>. If the broker
+does not confirm, the client MUST NOT use <code>$queue/</code> —
+preventing silent misrouting.</p></li>
+<li><p><strong>ACL isolation.</strong> The spec mandates
+<code>$queue/</code> access be controlled via ACLs, just like
+<code>$SYS/</code>. A v5.0 broker that doesn’t understand
+<code>$queue/</code> will simply apply its default ACL policy
+(typically: reject <code>$</code>-prefixed topics from unprivileged
+clients), preventing message loss by failing loudly.</p></li>
+</ol>
+<p><strong>Remaining Risk:</strong> A misconfigured v5.0 broker with
+open ACLs COULD treat <code>$queue/foo</code> as a literal topic and
+accept publishes, creating a silent reliability hole.
+<strong>Mitigation:</strong> Document that <code>$queue/</code> topics
+MUST be ACL-blocked on v5.0 brokers.</p>
+<hr />
+<h3
+id="criticism-3-the-fetch-packet-type-16-is-a-hard-break-that-undermines-the-whole-compatible-story.">Criticism
+3: “The FETCH packet (Type 16) is a hard break that undermines the whole
+‘compatible’ story.”</h3>
+<p><strong>From:</strong> Standards committee, library maintainers</p>
+<p><strong>The Argument:</strong> Type 16 was reserved in v5.0
+specifically to indicate an error. A v5.0 broker receiving a Type 16
+packet MUST close the connection. In a heterogeneous environment with
+mixed v5.0 and v6.0 brokers, a single misrouted FETCH packet causes
+cascading disconnections.</p>
+<p><strong>Rebuttal:</strong></p>
+<ol type="1">
+<li><p><strong>The Compatibility Layer exists for this reason.</strong>
+The Virtual FETCH mechanism (Section 4.2.2) provides identical semantics
+using standard v5.0 PUBLISH packets. No environment is forced to use
+native FETCH.</p></li>
+<li><p><strong>Protocol-level negotiation prevents misrouting.</strong>
+A client sets Protocol Level 6 in CONNECT. A v5.0 broker will reject the
+connection at the CONNECT stage with
+<code>Reason Code 0x84 (Unsupported Protocol Version)</code> — before
+any FETCH packet is ever sent. The client then falls back to
+Compatibility Mode. There is no scenario where a FETCH packet reaches a
+v5.0 broker in a correctly implemented client.</p></li>
+<li><p><strong>Clean version separation.</strong> Having a Level 6 that
+is truly distinct from Level 5 is better long-term than a “v5.1” that
+silently extends in ways that break some brokers but not others. The
+break is explicit and managed.</p></li>
+</ol>
+<hr />
+<h2 id="part-2-software-engineering-performance-critique">Part 2:
+Software Engineering &amp; Performance Critique</h2>
+<h3
+id="criticism-4-the-original-proposals-leader-node-model-contradicts-hivemqs-masterless-architecture.">Criticism
+4: “The original proposal’s Leader Node model contradicts HiveMQ’s
+masterless architecture.”</h3>
+<p><strong>From:</strong> HiveMQ engineers, distributed systems
+architects</p>
+<p><strong>The Argument:</strong> The early draft proposed assigning a
+“Leader Node” per <code>$queue/</code> via consistent hashing, with all
+publishes routing through that node. HiveMQ is explicitly masterless —
+all nodes are peers, no consensus protocol (Raft/Paxos) is used, and no
+node “owns” a topic. The Leader Node model would require HiveMQ to
+fundamentally change its architecture.</p>
+<p><strong>Resolution (accepted — the proposal was
+updated):</strong></p>
+<p>This criticism is <strong>correct</strong>. The Leader Node model was
+removed from the specification in favour of a <strong>Distributed
+Sequence Counter</strong> approach that is native to HiveMQ’s actual
+architecture:</p>
+<ol type="1">
+<li><p><strong>Distributed Sequence Counter.</strong> Each
+<code>$queue/</code> maintains a single cluster-wide atomic counter in
+HiveMQ’s replication data grid. Any node can increment it atomically
+(compare-and-swap) to claim the next sequence number. No routing changes
+are required; any node handles any publish. HiveMQ’s existing data grid
+already provides the distributed primitives needed.</p></li>
+<li><p><strong>No leader election, no Raft/Paxos.</strong> The atomic
+counter replaces the entire leader/follower model. Split-brain
+sequencing (two nodes issuing the same Seq) is prevented by the CAS
+semantics of the counter, not by funneling all traffic through one
+node.</p></li>
+<li><p><strong>Epoch triggers change.</strong> Instead of “leader
+failover triggers Epoch++”, the trigger is “replication quorum loss” —
+i.e., when a network partition resolves and the counter’s replicated
+state cannot be verified. This maps directly to HiveMQ’s partition
+detection events, which the Extension SDK already exposes.</p></li>
+<li><p><strong>Hot-queue scaling still works.</strong> If a single
+<code>$queue/</code> becomes a throughput bottleneck, the correct
+mitigation is application-level sharding (<code>$queue/line_1_A</code>,
+<code>$queue/line_1_B</code>) — exactly as you would shard a Kafka topic
+into multiple partitions. The counter CAS overhead per message is
+negligible compared to the NVMe write latency.</p></li>
+</ol>
+<hr />
+<h3
+id="criticism-5-replication-lag-will-cause-data-loss-in-the-replication-gap-window.">Criticism
+5: “Replication lag will cause data loss in the replication gap
+window.”</h3>
+<p><strong>From:</strong> SREs, database engineers</p>
+<p><strong>The Argument:</strong> Node A received a publish and
+incremented the sequence counter to Seq 100, but crashes before the
+message is replicated to other nodes. Node B has no record of Seq 100. A
+client that was tracking Seq 100 will detect a gap, but the message is
+unrecoverable.</p>
+<p><strong>Rebuttal:</strong></p>
+<ol type="1">
+<li><p><strong>Quorum write prevents the gap.</strong> The spec requires
+the PUBACK to the publisher only after the message is confirmed on
+<code>N</code> replicas (configurable <code>Replication-Factor</code>).
+With <code>Replication-Factor: 2</code>, Node A crashing never loses the
+message because Node B already has it before the publisher received its
+PUBACK.</p></li>
+<li><p><strong>The atomic counter and quorum write are
+decoupled.</strong> The sequence number is claimed first (atomic CAS on
+the counter), then the message is written to quorum. If Node A crashes
+between those two steps, the claimed Seq number is “orphaned.” This
+creates a one-time gap. The Epoch does NOT need to increment in this
+case — the surviving cluster knows the gap exists and can communicate it
+to consumers when they request that sequence range.</p></li>
+<li><p><strong>Epoch for partition events only.</strong> Epoch
+increments only when the entire counter quorum is lost (partition event)
+— not for individual node crashes. This reduces spurious full-resyncs
+that would otherwise be triggered by routine node restarts.</p></li>
+<li><p><strong>The v5.0 baseline is worse.</strong> A v5.0 broker
+silently loses the message with no signal to the client. v6.0 makes the
+gap explicit, auditable, and recoverable at the application
+layer.</p></li>
+</ol>
+<hr />
+<h3
+id="criticism-6-persistent-queues-on-the-broker-will-cause-storage-bloat-and-operational-nightmares.">Criticism
+6: “Persistent queues on the broker will cause storage bloat and
+operational nightmares.”</h3>
+<p><strong>From:</strong> SREs, operations teams</p>
+<p><strong>The Argument:</strong> If every <code>$queue/</code> is
+persisted to non-volatile storage forever, brokers will eventually run
+out of disk space. “Leaked queues” (queues no one is reading) will
+accumulate indefinitely. This is an operational disaster in a
+long-running production system.</p>
+<p><strong>Rebuttal:</strong></p>
+<ol type="1">
+<li><p><strong>Mandatory TTL and max-size properties.</strong> The spec
+requires <code>v6-queue-ttl</code> (how long to hold the queue after
+last consumer disconnect) and <code>v6-queue-max-size</code> (message
+count limit). Both default to implementation-defined values but MUST be
+configurable. The spec also requires a “drop-oldest” or “reject-new”
+policy when limits are reached — no silent unbounded growth.</p></li>
+<li><p><strong>“Tiered Storage” implementation model.</strong>
+Production brokers (analogous to HiveMQ or Kafka) should implement
+hot/cold storage: recent messages in RAM (or NVMe), deep backlogs tiered
+to object storage (S3/GCS). The broker is a transient buffer with
+bounded local cost.</p></li>
+<li><p><strong>Operational observability.</strong> 32-bit sequences make
+“leaked queue” detection trivial: an SRE can query
+<code>MAX(Seq) - Last_Consumer_ACK_Seq</code> to calculate exact backlog
+depth per queue in real-time. This is far better than the current
+situation where session-bound queues silently accumulate with no tooling
+to measure them.</p></li>
+</ol>
+<hr />
+<h2 id="part-3-sre-operational-critique">Part 3: SRE &amp; Operational
+Critique</h2>
+<h3
+id="criticism-7-the-fetch-mechanism-adds-latency-compared-to-push-delivery.">Criticism
+7: “The FETCH mechanism adds latency compared to push delivery.”</h3>
+<p><strong>From:</strong> Performance engineers, real-time systems
+architects</p>
+<p><strong>The Argument:</strong> A FETCH round-trip adds 2× the one-way
+latency compared to a push delivery. For real-time applications, this is
+unacceptable.</p>
+<p><strong>Rebuttal:</strong></p>
+<ol type="1">
+<li><p><strong>Scope clarification.</strong> FETCH is exclusively for
+<code>$queue/</code> topics — durable industrial queues. Standard
+pub/sub topics (real-time sensor telemetry, command delivery to online
+devices) continue to use push delivery unchanged. The proposal does not
+change push semantics for non-queue topics.</p></li>
+<li><p><strong>Cost-benefit for industrial queues.</strong> In
+semiconductor FDC or financial messaging, “missing a message” is
+infinitely more expensive than 5ms of added latency. The FETCH mechanism
+prevents the host system from crashing under data spikes — which is the
+#1 cause of unplanned downtime in industrial MQTT deployments.</p></li>
+<li><p><strong>Long-polling mitigates latency for near-real-time
+queues.</strong> The <code>Wait Timeout</code> property in the FETCH
+packet enables long-polling: the broker holds the connection open and
+responds immediately when a new message arrives. Effective latency is
+near-zero for well-paced queues.</p></li>
+</ol>
+<hr />
+<h3
+id="criticism-8-custom-property-ids-in-the-reserved-range-could-conflict-with-future-oasis-standardization.">Criticism
+8: “Custom property IDs in the reserved range could conflict with future
+OASIS standardization.”</h3>
+<p><strong>From:</strong> Standards committee members, protocol
+engineers</p>
+<p><strong>The Argument:</strong> Properties
+<code>0x30</code>–<code>0x45</code> are currently unassigned in MQTT
+v5.0, but they could be assigned by a future OASIS revision. If v6.0
+squats on these IDs and a future v5.1/v6.x assigns different semantics
+to the same IDs, we have a compatibility disaster.</p>
+<p><strong>Rebuttal:</strong></p>
+<ol type="1">
+<li><p><strong>This is exactly why we need formal
+standardization.</strong> The solution to “these IDs might be assigned
+later” is to submit v6.0 to OASIS and have the IDs formally reserved.
+The alternative — using User Properties forever — permanently forecloses
+binary optimization.</p></li>
+<li><p><strong>The proposal is already in “draft OASIS” format.</strong>
+The spec is structured to be submitted as an OASIS draft. Early
+submission reserves the property IDs before any conflict can
+arise.</p></li>
+<li><p><strong>Interim risk is manageable.</strong> During the
+pre-standardization period, the Compatibility Layer (User Properties)
+can be used exclusively. The reserved property IDs are only activated in
+native v6.0 brokers that understand the spec. A v5.0 broker will
+silently ignore them, not misinterpret them.</p></li>
+</ol>
+<hr />
+<h2 id="technical-pitfalls">Technical Pitfalls</h2>
+<h3 id="pitfall-1-sequence-wraparound-at-232">Pitfall 1: Sequence
+Wraparound at 2^32</h3>
+<p><strong>Description:</strong> A 32-bit sequence number wraps around
+after 4,294,967,295 messages. A high-throughput queue generating 100,000
+messages/second exhausts the sequence space in ~43,000 seconds (~12
+hours).</p>
+<p><strong>Mitigation:</strong> - For high-throughput queues, the broker
+MUST handle wraparound gracefully by treating <code>Seq 0</code> after
+<code>Seq 0xFFFFFFFF</code> as a continuation (not a gap). - For
+disambiguation, wraparound can be coupled with an Epoch increment — a
+full 32-bit cycle increments the Epoch. This gives an effective 48-bit
+sequence space. - A future revision may introduce 64-bit sequences for
+ultra-high-throughput use cases (see Annex B of the spec).</p>
+<hr />
+<h3 id="pitfall-2-idempotency-table-growth">Pitfall 2: Idempotency Table
+Growth</h3>
+<p><strong>Description:</strong> Consumers maintaining a “processed
+messages” idempotency table (for exactly-once semantics) may grow the
+table unboundedly if sequence numbers are not garbage-collected.</p>
+<p><strong>Mitigation:</strong> - The High-Watermark model (store only
+the latest processed Seq) is sufficient for in-order delivery queues —
+O(1) storage. - Only out-of-order delivery (not expected from ordered
+<code>$queue/</code> topics) requires a full set-based idempotency
+table. - Epoch Resets provide natural garbage-collection boundaries: on
+Epoch change, discard the entire idempotency table.</p>
+<hr />
+<h3 id="pitfall-3-competing-consumer-fairness">Pitfall 3: Competing
+Consumer Fairness</h3>
+<p><strong>Description:</strong> Round-robin distribution may create
+consumer starvation if one consumer processes messages slowly. Slow
+consumers receive fewer messages but still hold “locks” on in-flight
+messages, blocking queue throughput.</p>
+<p><strong>Mitigation:</strong> - The spec allows brokers to implement
+“least-loaded” instead of strict round-robin: distribute the next
+message to the consumer with the fewest unacknowledged messages. - A
+per-consumer <code>Receive Maximum</code> limit (inherited from v5.0)
+caps the number of in-flight locks per consumer. - Consumers that are
+consistently slow should be flagged via broker metrics and operator
+intervention.</p>
+<hr />
+<h3 id="pitfall-4-epoch-reset-as-a-dos-vector">Pitfall 4: Epoch Reset as
+a DoS Vector</h3>
+<p><strong>Description:</strong> A compromised or misconfigured broker
+could send spurious Epoch Reset signals, causing all connected clients
+to discard their idempotency state and re-synchronize simultaneously — a
+thundering herd.</p>
+<p><strong>Mitigation:</strong> - The spec requires Epoch increments
+only when the broker cannot guarantee sequence continuity (Section
+4.3.2). Any other Epoch increment is a protocol violation. - Clients
+SHOULD implement Epoch change rate limiting: more than N Epoch changes
+per hour is anomalous and should trigger an alert and/or connection
+refusal. - Epoch changes MUST be logged with timestamps and node
+identifiers for forensic auditing.</p>
+<hr />
+<h3 id="pitfall-5-virtual-fetch-overhead-compat-mode">Pitfall 5: Virtual
+FETCH Overhead (Compat Mode)</h3>
+<p><strong>Description:</strong> The Virtual FETCH mechanism publishes a
+message to <code>$SYS/queues/{name}/fetch</code> and waits for the
+broker to respond with the batch. This is two round-trips per batch plus
+the overhead of the control topic publish.</p>
+<p><strong>Mitigation:</strong> - Use the <code>Wait Timeout</code> user
+property with long-polling to reduce idle round-trips. - For
+high-throughput applications, pipeline FETCH requests (send the next
+FETCH before the current batch is fully acknowledged). - This overhead
+is the explicit trade-off of Compatibility Mode. Native v6.0 FETCH
+eliminates it; operators should plan to migrate to Protocol Level 6 for
+production high-throughput deployments.</p>
+<hr />
+<h3
+id="pitfall-6-queue-namespace-collision-with-existing-topics">Pitfall 6:
+<code>$queue/</code> Namespace Collision with Existing Topics</h3>
+<p><strong>Description:</strong> Deployments that already use topic
+paths containing the string <code>queue</code> (e.g.,
+<code>myapp/queue/events</code>) may have topic tree management issues
+or operator confusion.</p>
+<p><strong>Mitigation:</strong> - The <code>$queue/</code> prefix begins
+with <code>$</code>, which is already a reserved character in MQTT
+(standard topics never start with <code>$</code>). No collision with
+user-defined topic spaces is possible. - Operator documentation should
+clearly distinguish <code>$queue/</code> (protocol-level named queues)
+from <code>myapp/queue/</code> (application-level topic paths).</p>
+<hr />
+<h2 id="summary-risk-matrix">Summary: Risk Matrix</h2>
+<table>
+<colgroup>
+<col style="width: 32%" />
+<col style="width: 16%" />
+<col style="width: 20%" />
+<col style="width: 30%" />
+</colgroup>
+<thead>
+<tr>
+<th>Criticism / Pitfall</th>
+<th>Severity</th>
+<th>Probability</th>
+<th>Mitigation Quality</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Type 16 breaks v5.0 brokers</td>
+<td>High</td>
+<td>High (mixed env)</td>
+<td>✅ Full (compat layer)</td>
+</tr>
+<tr>
+<td>Leader node model (removed)</td>
+<td>High</td>
+<td>Resolved</td>
+<td>✅ Full (distributed counter)</td>
+</tr>
+<tr>
+<td>Replication lag / data loss</td>
+<td>High</td>
+<td>Low (with quorum)</td>
+<td>✅ Good (epoch + quorum)</td>
+</tr>
+<tr>
+<td>Storage bloat</td>
+<td>Medium</td>
+<td>Medium</td>
+<td>✅ Good (TTL + limits)</td>
+</tr>
+<tr>
+<td>Sequence wraparound (32-bit)</td>
+<td>Low</td>
+<td>Low (normal scale)</td>
+<td>✅ Good (epoch cycle)</td>
+</tr>
+<tr>
+<td>Epoch Reset DoS</td>
+<td>Medium</td>
+<td>Low</td>
+<td>⚠️ Partial (rate limiting)</td>
+</tr>
+<tr>
+<td>SUBSCRIBE bits break v5.0</td>
+<td>High</td>
+<td>High (native mode)</td>
+<td>✅ Full (user props)</td>
+</tr>
+<tr>
+<td>Property ID conflict (OASIS)</td>
+<td>Medium</td>
+<td>Low</td>
+<td>✅ Good (formalize early)</td>
+</tr>
+<tr>
+<td>Idempotency table growth</td>
+<td>Low</td>
+<td>Low (ordered queue)</td>
+<td>✅ Good (high-watermark)</td>
+</tr>
+<tr>
+<td>Virtual FETCH overhead</td>
+<td>Low</td>
+<td>High (compat mode)</td>
+<td>⚠️ Partial (pipeline)</td>
+</tr>
+</tbody>
+</table>
+<h1 id="mqtt-v6.0-performance-analysis-high-volume-use-cases">MQTT v6.0
+Performance Analysis: High-Volume Use Cases</h1>
+<blockquote>
+<p><strong>Focus:</strong> Large distributed energy providers (DEPs),
+grid SCADA, and industrial IoT at scale — characterised by millions of
+sensors, sub-second telemetry, burst fault events, and mandatory
+regulatory audit trails.</p>
+</blockquote>
+<hr />
+<h2 id="workload-profile">1. Workload Profile</h2>
+<table>
+<colgroup>
+<col style="width: 37%" />
+<col style="width: 62%" />
+</colgroup>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Typical DEP Scale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sensors / endpoints</td>
+<td>1M–10M (smart meters, PMUs, RTUs, substations)</td>
+</tr>
+<tr>
+<td>Steady-state throughput</td>
+<td>500k–3M msg/sec cluster-wide</td>
+</tr>
+<tr>
+<td>Burst (fault/storm event)</td>
+<td>10×–50× steady state for 30–120 seconds</td>
+</tr>
+<tr>
+<td>Message size</td>
+<td>64–512 bytes (telemetry); 1–50KB (commands, recipes)</td>
+</tr>
+<tr>
+<td>Latency requirement</td>
+<td>&lt;10ms for control commands; 100–500ms acceptable for
+telemetry</td>
+</tr>
+<tr>
+<td>Retention</td>
+<td>90 days regulatory minimum; 7 years for audit</td>
+</tr>
+<tr>
+<td>Consumer count</td>
+<td>10–200 competing consumers per queue (analytics pipelines)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="performance-bottlenecks-in-the-current-proposal">2. Performance
+Bottlenecks in the Current Proposal</h2>
+<h3 id="cas-counter-contention-at-scale">2.1 CAS Counter Contention at
+Scale</h3>
+<p><strong>Mechanism:</strong> The Distributed Sequence Counter requires
+an atomic CAS increment on the cluster data grid for every
+<code>$queue/</code> PUBLISH. Under contention, CAS degrades from O(1)
+to O(retries × RTT) as threads spin on the atomic variable.</p>
+<p><strong>Impact at DEP scale:</strong> A single
+<code>$queue/scada/events</code> receiving 500k msg/sec from 50k RTUs
+means ~10k CAS operations per second per broker node competing for the
+same counter. At 1ms inter-node RTT, contention-driven retry cycles will
+cap throughput well below the theoretical maximum.</p>
+<p><strong>Proposed fix — Partitioned Sequence Spaces:</strong></p>
+<p>Assign each broker node a pre-allocated sequence range of size
+<code>W</code> (the “window size”). Nodes increment locally without
+cross-node CAS until they exhaust their window, then claim the next
+window atomically.</p>
+<pre><code>Node 1 window: Seq 1 – 1,000,000        (local counter, no CAS)
+Node 2 window: Seq 1,000,001 – 2,000,000 (local counter, no CAS)
+Node 3 window: Seq 2,000,001 – 3,000,000 (local counter, no CAS)</code></pre>
+<ul>
+<li>Window claiming (CAS) is amortized across <code>W</code> messages —
+at W=1M and 500k msg/sec, each node claims a new window every ~2
+seconds.</li>
+<li>Gaps between windows are valid: Seq 1,000,000 → 1,000,001 is a valid
+“gap” — consumers must tolerate intra-window ordering while the global
+order is maintained at window boundaries.</li>
+<li>Window size <code>W</code> should be a configurable queue property
+(<code>v6-seq-window-size</code>).</li>
+</ul>
+<p><strong>New spec normative:</strong> The Stream Sequence Number MUST
+be monotonically increasing within a node’s assigned window. Global
+monotonicity across windows is RECOMMENDED but not REQUIRED — consumers
+MUST treat any Seq &gt; HWM as processable regardless of gap size when
+the queue uses partitioned sequence windows.</p>
+<hr />
+<h3 id="high-watermark-inadequacy-under-burst">2.2 High-Watermark
+Inadequacy Under Burst</h3>
+<p><strong>Current spec:</strong> Consumer maintains a single
+<code>High-Watermark</code> integer (last processed Seq). Works for
+ordered, serial consumption.</p>
+<p><strong>Problem at DEP scale:</strong> During a grid fault event, 50
+competing consumers receive messages in parallel. In-flight Seq values
+span a wide range simultaneously:</p>
+<pre><code>Consumer 1: processing Seq 10,001 (slow — database write)
+Consumer 2: processing Seq 10,050 (fast)
+Consumer 3: processing Seq 10,100 (fast)</code></pre>
+<p>If Consumer 2 and 3 finish before Consumer 1, their HWM would advance
+past Consumer 1’s in-flight message. If Consumer 1 then crashes, the
+group HWM is ambiguous — “did we process 10,001?”</p>
+<p><strong>Proposed fix — Sliding Window HWM:</strong></p>
+<p>Replace the single HWM integer with a <strong>min/max window</strong>
+tracked per consumer group at the broker:</p>
+<pre><code>Group HWM = {
+  committed:  10,000   (all Seq ≤ this are acknowledged by all group members)
+  in_flight:  [10,001, 10,002, ..., 10,150]  (dispatched, awaiting PUBACK)
+  max_dispatched: 10,150
+}</code></pre>
+<ul>
+<li><code>committed</code> advances only when all Seq below the next gap
+are acknowledged.</li>
+<li>The broker tracks in-flight locks as a bitset bounded by
+<code>Receive Maximum</code>.</li>
+<li>Consumer crash recovery: any in-flight Seq belonging to the crashed
+consumer is re-dispatched to the next available consumer.</li>
+<li>Client-side HWM for exactly-once deduplication remains a single
+integer (<code>committed</code>), not the full window.</li>
+</ul>
+<p><strong>New spec normative:</strong> Brokers implementing SQMC
+competing consumer mode MUST track a per-group
+<code>committed_hwm</code> (the highest Seq for which all lower Seqs are
+acknowledged) in addition to the per-consumer in-flight lock set.</p>
+<hr />
+<h3 id="quorum-write-latency-vs.-real-time-telemetry">2.3 Quorum Write
+Latency vs. Real-Time Telemetry</h3>
+<p><strong>Current spec:</strong> All <code>$queue/</code> PUBLISH
+operations require a quorum write before PUBACK. At replication factor 2
+and 1ms inter-node RTT, this adds 2–5ms per message.</p>
+<p><strong>Impact at DEP scale:</strong> PMU (Phasor Measurement Unit)
+data arrives at 60 samples/sec per device. A 2–5ms PUBACK delay is
+acceptable. But for 50k PMUs generating 3M msg/sec total, quorum write
+serialisation creates head-of-line blocking in the broker’s replication
+pipeline — effective throughput drops by 40–60% compared to async
+replication.</p>
+<p><strong>Proposed fix — Durability Tier Namespaces:</strong></p>
+<p>Split the <code>$queue/</code> namespace into three tiers with
+different durability contracts:</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 27%" />
+<col style="width: 22%" />
+</colgroup>
+<thead>
+<tr>
+<th>Namespace</th>
+<th>Durability</th>
+<th>Write Path</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>$queue/</code></td>
+<td>Synchronous quorum</td>
+<td>PUBACK after N replicas</td>
+<td>Commands, audit, SECS/GEM S2F21</td>
+</tr>
+<tr>
+<td><code>$stream/</code></td>
+<td>Async replication</td>
+<td>PUBACK after local write; replication in background</td>
+<td>High-frequency telemetry, PMU data</td>
+</tr>
+<tr>
+<td><code>$log/</code></td>
+<td>Append-only, eventual</td>
+<td>PUBACK immediately; batched replication</td>
+<td>FDC data, bulk sensor history</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>The same FETCH, Seq, and Epoch semantics apply to all three
+tiers.</li>
+<li><code>$stream/</code> and <code>$log/</code> topics carry a
+<code>Durability</code> property (<code>0x43</code>) in PUBLISH
+indicating the tier: <code>0x01</code> = sync quorum, <code>0x02</code>
+= async, <code>0x03</code> = eventual.</li>
+<li>Consumers subscribing to <code>$stream/</code> or <code>$log/</code>
+MUST tolerate occasional Seq gaps (due to async write failures) and
+SHOULD NOT use exactly-once semantics based on Seq alone.</li>
+</ul>
+<hr />
+<h3 id="fetch-batch-size-tuning-for-burst-recovery">2.4 FETCH Batch Size
+Tuning for Burst Recovery</h3>
+<p><strong>Current spec:</strong> <code>Batch Size</code> is a fixed
+integer per FETCH request.</p>
+<p><strong>Problem:</strong> During burst recovery (after a 60-second
+grid storm event), a consumer with a 10M-message backlog issuing
+<code>batch=100</code> requests requires 100k round-trips to drain the
+queue. At 10ms RTT, that is 16 minutes of drain time.</p>
+<p><strong>Proposed fix — Adaptive Batch Size:</strong></p>
+<p>Add two optional FETCH properties:</p>
+<ul>
+<li><code>v6-batch-max</code>: Upper bound on batch size the consumer
+will accept (consumer protection).</li>
+<li><code>v6-batch-target-ms</code>: Target delivery window in
+milliseconds. The broker calculates the batch size needed to fill the
+window based on queue throughput, bounded by
+<code>v6-batch-max</code>.</li>
+</ul>
+<p>For a consumer that wants “deliver as many as I can process in
+500ms”, the broker calculates:</p>
+<pre><code>batch = min(v6-batch-max, queue_throughput_per_ms × 500)</code></pre>
+<p>This eliminates the need for consumers to manually tune batch sizes
+as queue depth fluctuates.</p>
+<hr />
+<h3 id="rate-limiting-granularity">2.5 Rate Limiting Granularity</h3>
+<p><strong>Current spec:</strong> Throughput Limit (Property
+<code>0x41</code>) is per-connection in KB/s.</p>
+<p><strong>Problem for DEPs:</strong> A DEP SCADA system has thousands
+of client connections sharing the same broker. A per-connection limit
+cannot prevent a single rogue data pipeline from saturating broker NIC
+bandwidth while legitimate control traffic is dropped.</p>
+<p><strong>Proposed fixes:</strong></p>
+<ol type="1">
+<li><p><strong>Per-queue rate limit:</strong> Add a
+<code>v6-queue-rate-limit</code> User Property to SUBSCRIBE, specifying
+max msgs/sec the broker will release from that queue to this consumer
+group — independent of connection-level limits.</p></li>
+<li><p><strong>Priority-based admission:</strong> High-priority messages
+(<code>v6-priority: 255</code>) bypass the rate limiter. This ensures
+S2F21 (process start) commands are never delayed by FDC data
+storms.</p></li>
+<li><p><strong>Credit-based flow control:</strong> Replace the
+token-bucket CONNACK approach with an explicit credit system:</p>
+<ul>
+<li>Broker sends <code>CREDIT {queue_name, msgs_per_sec}</code> in
+CONNACK or a new control topic.</li>
+<li>Consumer sends <code>CREDIT_RETURN</code> when it can accept
+more.</li>
+<li>This is analogous to AMQP 1.0’s link credits and prevents both
+flooding and starvation.</li>
+</ul></li>
+</ol>
+<hr />
+<h3 id="epoch-reset-thundering-herd">2.6 Epoch Reset Thundering
+Herd</h3>
+<p><strong>Current spec:</strong> On Epoch reset, all consumers
+connected to the affected queue simultaneously discard their HWMs and
+begin full resyncs.</p>
+<p><strong>Problem at DEP scale:</strong> With 200 competing consumers
+on <code>$queue/grid/events</code>, a single partition event triggers
+200 simultaneous full resyncs — each reading the queue from Seq=0. This
+is a thundering herd that can exhaust broker I/O for minutes.</p>
+<p><strong>Proposed fix — Staggered Resync:</strong></p>
+<p>Add a <code>v6-resync-jitter-ms</code> property to DISCONNECT (Reason
+Code 0xA0). Each consumer receives a different jitter value (e.g.,
+uniformly distributed over 0–30,000ms). Consumers delay their CONNECT
+retry and resync by this value. The broker staggers the resyncs,
+preventing I/O saturation.</p>
+<p>For the broker to generate useful jitter values:</p>
+<pre><code>jitter_for_consumer_i = (consumer_group_size × resync_window_ms / N) × i</code></pre>
+<p>where <code>i</code> is the consumer’s ordinal within the group
+(known from SQMC group membership).</p>
+<hr />
+<h2 id="updated-property-table">3. Updated Property Table</h2>
+<table>
+<colgroup>
+<col style="width: 11%" />
+<col style="width: 17%" />
+<col style="width: 17%" />
+<col style="width: 26%" />
+<col style="width: 26%" />
+</colgroup>
+<thead>
+<tr>
+<th>ID</th>
+<th>Name</th>
+<th>Type</th>
+<th>Packets</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x30</code></td>
+<td>Stream Sequence</td>
+<td>4B Int</td>
+<td>PUBLISH</td>
+<td>Monotonic message ID</td>
+</tr>
+<tr>
+<td><code>0x35</code></td>
+<td>Stream Epoch</td>
+<td>2B Int</td>
+<td>PUBLISH, CONNACK</td>
+<td>Cluster era</td>
+</tr>
+<tr>
+<td><code>0x41</code></td>
+<td>Throughput Limit</td>
+<td>4B Int (KB/s)</td>
+<td>CONNACK</td>
+<td>Per-connection rate cap</td>
+</tr>
+<tr>
+<td><code>0x42</code></td>
+<td>Batch Size</td>
+<td>4B Int</td>
+<td>FETCH</td>
+<td>Max messages per batch</td>
+</tr>
+<tr>
+<td><code>0x43</code></td>
+<td><strong>Durability Tier</strong></td>
+<td>1B Enum</td>
+<td>PUBLISH</td>
+<td><code>0x01</code> sync, <code>0x02</code> async, <code>0x03</code>
+eventual</td>
+</tr>
+<tr>
+<td><code>0x44</code></td>
+<td><strong>Batch Target Ms</strong></td>
+<td>2B Int</td>
+<td>FETCH</td>
+<td>Target delivery window for adaptive batching</td>
+</tr>
+<tr>
+<td><code>0x45</code></td>
+<td><strong>Resync Jitter Ms</strong></td>
+<td>2B Int</td>
+<td>DISCONNECT (0xA0)</td>
+<td>Staggered resync delay</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="namespace-additions">4. Namespace Additions</h2>
+<table>
+<colgroup>
+<col style="width: 23%" />
+<col style="width: 23%" />
+<col style="width: 21%" />
+<col style="width: 30%" />
+</colgroup>
+<thead>
+<tr>
+<th>Namespace</th>
+<th>Durability</th>
+<th>Sequence</th>
+<th>Exactly-Once</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>$queue/</code></td>
+<td>Sync quorum</td>
+<td>Strict monotonic</td>
+<td>Supported</td>
+</tr>
+<tr>
+<td><code>$stream/</code></td>
+<td>Async replicated</td>
+<td>Best-effort monotonic</td>
+<td>Not guaranteed</td>
+</tr>
+<tr>
+<td><code>$log/</code></td>
+<td>Eventual / append</td>
+<td>Monotonic within node</td>
+<td>Not supported</td>
+</tr>
+<tr>
+<td><code>$SYS/queues/*/fetch</code></td>
+<td>N/A (control)</td>
+<td>N/A</td>
+<td>N/A</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="summary-adaptations-for-dep-scale">5. Summary: Adaptations for
+DEP Scale</h2>
+<table>
+<colgroup>
+<col style="width: 32%" />
+<col style="width: 50%" />
+<col style="width: 17%" />
+</colgroup>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Scale Trigger</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CAS counter contention</td>
+<td>&gt;100k msg/sec per queue</td>
+<td>Partitioned sequence windows (<code>v6-seq-window-size</code>)</td>
+</tr>
+<tr>
+<td>Single-integer HWM inadequate</td>
+<td>&gt;10 competing consumers</td>
+<td>Sliding window HWM — committed + in-flight bitset</td>
+</tr>
+<tr>
+<td>Quorum write latency</td>
+<td>&gt;1M msg/sec telemetry</td>
+<td>Durability tier namespaces (<code>$stream/</code>,
+<code>$log/</code>)</td>
+</tr>
+<tr>
+<td>Slow backlog drain</td>
+<td>Post-burst recovery</td>
+<td>Adaptive batch size (<code>v6-batch-target-ms</code>)</td>
+</tr>
+<tr>
+<td>Per-connection rate limit too coarse</td>
+<td>Thousands of connections</td>
+<td>Per-queue rate limit + priority admission bypass</td>
+</tr>
+<tr>
+<td>Epoch reset thundering herd</td>
+<td>&gt;50 consumers, partition event</td>
+<td>Staggered resync with <code>v6-resync-jitter-ms</code></td>
+</tr>
+</tbody>
+</table>
 <h1 id="critical-analyses-of-mqtt-v6.0">Critical Analyses of MQTT
 v6.0</h1>
 <blockquote>
@@ -4928,5 +5881,2055 @@ Criticisms — Why Standardize Now</a> for the full argument.</p>
 </tr>
 </tbody>
 </table>
+<h1 id="sqmc-vs.-hivemq-declared-shared-subscriptions">SQMC vs. HiveMQ
+Declared Shared Subscriptions</h1>
+<blockquote>
+<p><strong>Context:</strong> A common question when reviewing the MQTT
+v6.0 SQMC proposal is whether HiveMQ’s existing <a
+href="https://docs.hivemq.com/hivemq/latest/user-guide/declared-shared-subscriptions.html">Declared
+Shared Subscriptions</a> feature already provides the same capabilities.
+The short answer: partially, but with four significant gaps — and its
+existence as a proprietary extension is itself evidence that the
+standard has a gap.</p>
+</blockquote>
+<hr />
+<h2 id="what-declared-shared-subscriptions-does">What Declared Shared
+Subscriptions Does</h2>
+<p>HiveMQ Declared Shared Subscriptions are pre-configured
+<code>$share/</code> groups defined in broker configuration (rather than
+dynamically via SUBSCRIBE). Their key addition over standard
+<code>$share/</code> is that messages are <strong>buffered even when no
+subscriber is connected</strong> — the queue persists across subscriber
+disconnects.</p>
+<p>This is a real and valuable improvement over the standard
+<code>$share/</code> behavior, where the spec is silent on what to do
+with messages when no subscriber is active.</p>
+<hr />
+<h2 id="the-gaps">The Gaps</h2>
+<p>Declared Shared Subscriptions solve the offline-buffering problem.
+They do not solve the remaining gaps that SQMC addresses:</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>Capability</th>
+<th><code>$share/</code> (MQTT v5.0 Spec)</th>
+<th>HiveMQ Declared Shared Subscriptions</th>
+<th>SQMC (<code>$queue/</code> + v6.0)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Buffer messages when no subscriber connected</strong></td>
+<td>Not guaranteed — spec is silent</td>
+<td>✅ Yes — HiveMQ’s primary addition</td>
+<td>✅ Yes — <code>$queue/</code> persists independently</td>
+</tr>
+<tr>
+<td><strong>Re-dispatch unacked message on consumer
+disconnect</strong></td>
+<td>❌ No — <code>[MQTT-4.8.2-5]</code> prohibits; message discarded if
+session terminates</td>
+<td>❌ No — <code>[MQTT-4.8.2-5]</code> still applies at spec level</td>
+<td>✅ Yes — lock released immediately; re-dispatched to next available
+consumer</td>
+</tr>
+<tr>
+<td><strong>Exclusive consumer / hot-standby mode</strong></td>
+<td>❌ No</td>
+<td>❌ No</td>
+<td>✅ Yes — primary consumer + automatic standby promotion on
+disconnect</td>
+</tr>
+<tr>
+<td><strong>Message ordering guarantee</strong></td>
+<td>❌ No — <code>[MQTT-4.6.0-6]</code> scopes ordering to non-shared
+subscriptions only</td>
+<td>❌ No</td>
+<td>✅ Yes — strict ascending Stream Sequence Number per queue</td>
+</tr>
+<tr>
+<td><strong>Gap detection</strong></td>
+<td>❌ Impossible — no per-message identity</td>
+<td>❌ Impossible</td>
+<td>✅ Built-in — sequence gaps are detectable and auditable</td>
+</tr>
+<tr>
+<td><strong>Survives broker restart (spec-mandated)</strong></td>
+<td>❌ No — persistence is implementation-defined</td>
+<td>✅ Yes (HiveMQ-specific behavior)</td>
+<td>✅ Yes — persistence to non-volatile storage required before
+PUBACK</td>
+</tr>
+<tr>
+<td><strong>Interoperable across broker vendors</strong></td>
+<td>✅ Yes — standard</td>
+<td>❌ No — HiveMQ-proprietary</td>
+<td>✅ Yes — standardized wire format</td>
+</tr>
+<tr>
+<td><strong>Named, inspectable entity</strong></td>
+<td>❌ No — subscription pattern only</td>
+<td>❌ No — broker config entry only</td>
+<td>✅ Yes — <code>$queue/</code> is a first-class entity with TTL,
+max-size, storage policy</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="the-critical-gap-mqtt-4.8.2-5">The Critical Gap:
+<code>[MQTT-4.8.2-5]</code></h2>
+<p>The most consequential difference is message re-dispatch on consumer
+failure. <a
+href="https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901250">MQTT
+v5.0 Section 4.8.2, normative requirement
+<code>[MQTT-4.8.2-5]</code></a> states:</p>
+<blockquote>
+<p><em>“If the Client’s Session terminates before the Client reconnects,
+the Server MUST NOT send the Application Message to any other subscribed
+Client.”</em></p>
+</blockquote>
+<p>This means: if a consumer in any <code>$share/</code> group
+(including a Declared Shared Subscription) receives a QoS 1 message,
+disconnects before sending PUBACK, and its session expires — the message
+is <strong>discarded</strong>. The spec explicitly prohibits the broker
+from re-delivering it to another consumer.</p>
+<p>In traditional competing-consumer queues (AMQP, JMS, Kafka consumer
+groups), an unacknowledged message is returned to the queue and
+re-dispatched. In MQTT v5.0 shared subscriptions, it is destroyed.</p>
+<p>SQMC breaks from this by treating <code>$queue/</code> topics as
+session-independent persistent stores. When a competing consumer
+disconnects, the message lock is released by the broker and the message
+is immediately re-dispatched — regardless of session state. This is the
+behavior industrial systems require and cannot get from any
+<code>$share/</code>-based mechanism, proprietary or otherwise.</p>
+<hr />
+<h2 id="the-exclusive-consumer-gap">The Exclusive Consumer Gap</h2>
+<p>Declared Shared Subscriptions provide no equivalent to SQMC Exclusive
+Consumer mode. There is no mechanism in <code>$share/</code> — declared
+or dynamic — to designate one consumer as primary and hold others as hot
+standbys that take over instantly on primary disconnect while preserving
+strict ordering.</p>
+<p>This pattern is non-negotiable for safety-critical command streams:
+SECS/GEM S2F21 (Remote Start), grid protection relay commands, and
+financial settlement messages where exactly one consumer must process
+each message in strict order, with zero-delay failover and no message
+loss or duplication on consumer failure.</p>
+<hr />
+<h2
+id="why-declared-shared-subscriptions-is-the-argument-not-the-counterargument">Why
+Declared Shared Subscriptions Is the Argument, Not the
+Counterargument</h2>
+<p>The existence of Declared Shared Subscriptions as a
+HiveMQ-proprietary feature is itself evidence that the MQTT standard has
+a gap. HiveMQ built it because <code>$share/</code> alone did not
+satisfy customer requirements. The same customers who use Declared
+Shared Subscriptions are the ones asking for re-dispatch-on-failure and
+exclusive consumer semantics — features that Declared Shared
+Subscriptions does not provide.</p>
+<p>The extension-first path (build it proprietary, standardize later) is
+also how <code>$SYS/</code> became permanently fragmented: EMQX,
+Mosquitto, and HiveMQ each implemented it differently, and 15 years
+later there is still no standard. If SQMC semantics are standardized now
+— before EMQX, AWS IoT Core, and others build incompatible variants —
+the ecosystem gets a single interoperable wire representation. If they
+are not, every customer running two broker vendors will need a
+translation layer between competing proprietary implementations.</p>
+<hr />
+<h2 id="summary">Summary</h2>
+<p>Declared Shared Subscriptions is a useful proprietary improvement to
+<code>$share/</code> that addresses the offline-buffering gap. It does
+not address:</p>
+<ol type="1">
+<li><strong>Message re-dispatch on consumer failure</strong> —
+<code>[MQTT-4.8.2-5]</code> prohibits this at the spec level for all
+<code>$share/</code>-based mechanisms</li>
+<li><strong>Exclusive consumer / hot-standby semantics</strong> — not
+available in any <code>$share/</code> variant</li>
+<li><strong>Message ordering guarantees</strong> — explicitly out of
+scope for shared subscriptions per the v5.0 spec</li>
+<li><strong>Interoperability</strong> — a HiveMQ-only feature; no other
+broker supports it</li>
+</ol>
+<p>SQMC addresses all four. Its standardization closes the gap that
+Declared Shared Subscriptions can only partially fill — and closes it in
+a way that works across every v6.0-compliant broker.</p>
+<h1 id="the-application-layer-lift-overview">The Application Layer Lift
+— Overview</h1>
+<blockquote>
+<p><strong>Context:</strong> This document addresses the standards
+committee criticism that the MQTT 6.0 specification conflates broker
+obligations with application-layer responsibilities. It proposes three
+structural approaches to drawing a clear boundary between what the
+<strong>protocol</strong> provides and what the <strong>application
+layer</strong> must implement using those primitives.</p>
+</blockquote>
+<hr />
+<h2 id="the-core-insight">The Core Insight</h2>
+<p>The MQTT 6.0 proposal solves two distinct problems that have
+historically been bundled together:</p>
+<ol type="1">
+<li><p><strong>Protocol Primitives</strong> — Things the <em>broker</em>
+must implement: durable queue storage, sequence number assignment, epoch
+signaling, pull-based message delivery, and strict consumer group
+enforcement. These require changes to the wire format and broker
+behavior. They cannot be “lifted” to the application layer — if the
+broker doesn’t do them, no amount of client-side code can
+compensate.</p></li>
+<li><p><strong>Application Patterns</strong> — Things the <em>client
+library</em> must implement using those primitives: gap detection, epoch
+resync procedures, high-watermark tracking, idempotent processing
+workflows, consumer state machines, and reconnect/resume logic. These
+sit above the protocol. They are expressible in any language, testable
+independently of the broker, and can evolve faster than an OASIS
+standard.</p></li>
+</ol>
+<p>The current MQTT 6.0 specification interleaves both. This is the
+source of the committee’s “mux’ing” objection (Simon, March 2026). The
+three options below each propose a different way to draw the boundary
+explicitly.</p>
+<hr />
+<h2 id="the-split-protocol-vs.-application-layer">The Split: Protocol
+vs. Application Layer</h2>
+<p>Regardless of which structural option is chosen, the feature split is
+the same:</p>
+<h3 id="protocol-layer-broker-obligations-mqtt-6.0-spec">Protocol Layer
+— Broker Obligations (MQTT 6.0 Spec)</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Feature</th>
+<th>What the Broker Does</th>
+<th>Property / Mechanism</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Durable Queue Storage</td>
+<td>Persist messages before PUBACK; retain independent of sessions</td>
+<td><code>$queue/</code> namespace</td>
+</tr>
+<tr>
+<td>Stream Sequence Assignment</td>
+<td>Assign monotonically increasing 32-bit integer per queue
+message</td>
+<td>Property <code>0x30</code></td>
+</tr>
+<tr>
+<td>Epoch Signaling</td>
+<td>Set Epoch in CONNACK when sequence continuity cannot be
+guaranteed</td>
+<td>Property <code>0x35</code></td>
+</tr>
+<tr>
+<td>Pull-Based Delivery</td>
+<td>Hold messages until FETCH received; deliver requested batch</td>
+<td>FETCH / Virtual FETCH</td>
+</tr>
+<tr>
+<td>SQMC Enforcement</td>
+<td>Enforce competing/exclusive consumer modes; re-dispatch on
+disconnect</td>
+<td><code>v6-semantics</code> User Property</td>
+</tr>
+<tr>
+<td>Throughput Limiting</td>
+<td>Enforce KB/s limits set in CONNACK</td>
+<td>Property <code>0x41</code></td>
+</tr>
+<tr>
+<td>v6.0 Handshake</td>
+<td>Echo <code>mqtt-ext: v6.0</code> in CONNACK to confirm
+capability</td>
+<td>User Property</td>
+</tr>
+</tbody>
+</table>
+<h3
+id="application-layer-client-library-obligations-the-lift">Application
+Layer — Client Library Obligations (“The Lift”)</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Responsibility</th>
+<th>What the Client Library Does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Gap Detection</td>
+<td>Track <code>expected_seq</code> per queue; detect when
+<code>received_seq ≠ expected_seq</code></td>
+</tr>
+<tr>
+<td>High-Watermark Tracking</td>
+<td>Persist last successfully processed Seq per queue (O(1) state)</td>
+</tr>
+<tr>
+<td>Epoch Change Handler</td>
+<td>On Epoch mismatch in CONNACK: discard idempotency state,
+re-establish watermark</td>
+</tr>
+<tr>
+<td>Consumer State Machine</td>
+<td>Manage states: CONNECTING → HANDSHAKING → FETCHING → PROCESSING →
+ACKNOWLEDGING → RESYNCING</td>
+</tr>
+<tr>
+<td>Exactly-Once Workflow</td>
+<td>Check seq against watermark → process → advance watermark →
+PUBACK</td>
+</tr>
+<tr>
+<td>Reconnect / Resume</td>
+<td>Send <code>last-seq</code> and <code>current-epoch</code> as User
+Properties in CONNECT</td>
+</tr>
+<tr>
+<td>FETCH Pacing</td>
+<td>Manage batch sizing, pipeline depth, and back-pressure
+signaling</td>
+</tr>
+<tr>
+<td>Idempotency Table Lifecycle</td>
+<td>When to use watermark vs. set-based dedup; garbage collection on
+Epoch reset</td>
+</tr>
+<tr>
+<td>Sequence Wraparound</td>
+<td>Treat Seq 0 after Seq 0xFFFFFFFF as continuation; coordinate with
+Epoch at rollover</td>
+</tr>
+<tr>
+<td>SQMC Application Patterns</td>
+<td>Map competing/exclusive modes to use-case requirements; handle
+failover scenarios</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="why-this-answers-the-committee">Why This Answers the
+Committee</h2>
+<p>Simon’s criticism — <em>“There appears to be a mux’ing of what is
+expected of the application and what is expected of the protocol”</em> —
+is valid and can be resolved structurally. The three options below each
+offer a different level of separation:</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>Option</th>
+<th>Separation Level</th>
+<th>Documents</th>
+<th>OASIS Submission</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>A</strong></td>
+<td>Hard split — two independent documents</td>
+<td>MQTT 6.0 spec + MQTT Stream Application Profile</td>
+<td>Protocol spec only</td>
+</tr>
+<tr>
+<td><strong>B</strong></td>
+<td>Soft split — one document, explicit boundary</td>
+<td>MQTT 6.0 spec with Normative Annex A</td>
+<td>Full spec as single submission</td>
+</tr>
+<tr>
+<td><strong>C</strong></td>
+<td>Maximum split — two independent specifications</td>
+<td>MQTT 6.0 transport extension + MQTT Stream 1.0 app protocol</td>
+<td>Two separate tracks</td>
+</tr>
+</tbody>
+</table>
+<p>The key concession in all three options: <strong>Simon is
+correct</strong>. Gap detection, epoch resync, consumer state machines,
+and exactly-once processing workflows are application-layer
+responsibilities. The MQTT 6.0 specification does not need to define
+them — it only needs to provide the primitives that make them possible
+to implement correctly and interoperably.</p>
+<hr />
+<h2 id="three-options">Three Options</h2>
+<ul>
+<li><p><strong><a href="lift-option-a.md">Option A: Slim Protocol + MQTT
+Stream Application Profile</a></strong> Reduces the MQTT 6.0 spec to
+broker-only primitives. Publishes a separate companion “MQTT Stream
+Application Profile” defining client library behavior. Analogous to MQTT
++ Sparkplug B, but officially blessed by the MQTT 6.0 ecosystem.
+Recommended starting point.</p></li>
+<li><p><strong><a href="lift-option-b.md">Option B: Protocol Spec +
+Normative Annex A</a></strong> Keeps a single MQTT 6.0 document but
+restructures it: Sections 1–7 contain only broker obligations; Normative
+Annex A defines client library requirements. Same total scope, explicit
+structural boundary. Easiest single OASIS submission.</p></li>
+<li><p><strong><a href="lift-option-c.md">Option C: Two Independent
+Specifications</a></strong> Maximum separation. MQTT 6.0 is a minimal
+wire-format extension (broker-only). A fully separate “MQTT Stream 1.0”
+specification defines the application protocol that uses MQTT 6.0 as
+transport. Analogous to CoAP + LwM2M or HTTP + REST. Strongest answer to
+protocol purists; requires two standardization tracks.</p></li>
+</ul>
+<hr />
+<h2 id="recommendation-1">Recommendation</h2>
+<p>For the current committee review stage, <strong>Option A</strong>
+offers the best balance: it visibly slims the protocol spec (addressing
+the “bloat” criticism), explicitly concedes the application-layer
+boundary (addressing Simon’s mux’ing criticism), and provides a
+practical path where the MQTT Stream Application Profile can be adopted
+by Eclipse Foundation while the protocol primitives proceed through
+OASIS.</p>
+<p>If the committee’s primary concern is procedural scope (what OASIS is
+asked to ratify), <strong>Option C</strong> is the strongest answer. If
+a single-document submission is operationally required, <strong>Option
+B</strong> is the pragmatic choice.</p>
+<p>All three options share the same feature split — only the document
+structure and governance path differ.</p>
+<h1
+id="option-a-mqtt-6.0-protocol-primitives-mqtt-stream-application-profile">Option
+A: MQTT 6.0 Protocol Primitives + MQTT Stream Application Profile</h1>
+<blockquote>
+<p><strong>Author:</strong> Bill Sommers, AI Solutions Lead, HiveMQ,
+Inc. <strong>Status:</strong> Discussion draft for standards committee
+review — March 2026 <strong>Addresses:</strong> Simon’s “mux’ing of
+application and protocol expectations” criticism</p>
+</blockquote>
+<hr />
+<h2 id="overview">1. Overview</h2>
+<p>The central concern raised by Simon in the committee review is that
+the current MQTT 6.0 specification conflates two distinct layers of
+obligation: what the <strong>broker must do</strong> and what the
+<strong>client library must do</strong>. His exact phrasing — <em>“there
+appears to be a mux’ing of what is expected of the application and what
+is expected of the protocol”</em> — identifies a real structural problem
+in the draft, and this document addresses it directly.</p>
+<p>Option A resolves the mux’ing by splitting the proposal into two
+independent documents with a clean interface between them:</p>
+<ol type="1">
+<li><p><strong>MQTT 6.0 Protocol Specification</strong> — defines six
+broker-level primitives. Normative obligations using MUST/MUST NOT.
+Submitted to OASIS. Protocol parsers, broker implementers, and
+wire-format tooling implement this layer.</p></li>
+<li><p><strong>MQTT Stream Application Profile</strong> — defines client
+library behavior built on top of those primitives. Normative obligations
+using REQUIRES/RECOMMENDS. Submitted to Eclipse Foundation (alongside
+Sparkplug B). Client library authors and application framework
+developers implement this layer.</p></li>
+</ol>
+<p>The architectural relationship is identical to MQTT itself versus
+Eclipse Sparkplug B. MQTT defines the transport primitives (PUBLISH,
+SUBSCRIBE, QoS levels). Sparkplug B defines application behavior on top
+of those primitives (64-bit sequence fields in protobuf payloads,
+birth/death certificate state management, group IDs). Two governing
+bodies, two documents, one coherent system.</p>
+<p>This document does not propose removing any feature from the v6.0
+ecosystem. It proposes assigning each feature to the layer where it
+belongs.</p>
+<hr />
+<h2 id="the-protocol-layer-what-stays-in-the-mqtt-6.0-specification">2.
+The Protocol Layer: What Stays in the MQTT 6.0 Specification</h2>
+<p>The MQTT 6.0 Protocol Specification defines the obligations of the
+<strong>broker</strong> — specifically, what the broker MUST do when it
+encounters v6.0 protocol elements. Client behavior noted below is the
+minimum required to invoke these broker obligations; everything else is
+the Application Profile’s domain.</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Protocol Specification Obligation</th>
+<th>Normative Level</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>$queue/</code> durable persistence</strong></td>
+<td>The broker MUST persist a message published to a
+<code>$queue/</code> topic to non-volatile storage before sending
+PUBACK. The queue MUST continue to exist and retain messages
+independently of any client session.</td>
+<td>MUST</td>
+</tr>
+<tr>
+<td><strong>Stream Sequence Number (<code>0x30</code>)</strong></td>
+<td>The broker MUST assign a monotonically increasing 32-bit Sequence
+Number to each message accepted into a <code>$queue/</code>. Sequence
+Numbers MUST be cluster-wide and MUST NOT be reused within an
+Epoch.</td>
+<td>MUST</td>
+</tr>
+<tr>
+<td><strong>Stream Epoch (<code>0x35</code>)</strong></td>
+<td>The broker MUST include the current Epoch value in CONNACK. The
+broker MUST increment the Epoch when it cannot guarantee sequence
+continuity for one or more queues (e.g., after a partition event or
+unrecoverable state loss). The broker MUST NOT increment the Epoch for
+routine operations that preserve continuity.</td>
+<td>MUST</td>
+</tr>
+<tr>
+<td><strong>FETCH / Virtual FETCH</strong></td>
+<td>The broker MUST NOT push <code>$queue/</code> messages to a
+subscriber unless a FETCH request is pending or in force. On receiving a
+FETCH request, the broker MUST deliver up to the requested
+<code>batch-size</code> messages in ascending Sequence Number
+order.</td>
+<td>MUST</td>
+</tr>
+<tr>
+<td><strong>SQMC subscription semantics</strong></td>
+<td>When a subscriber includes <code>v6-semantics: competing</code> in
+SUBSCRIBE User Properties, the broker MUST deliver each
+<code>$queue/</code> message to exactly one subscriber in the group.
+When <code>v6-semantics: exclusive</code> is specified, the broker MUST
+deliver to the primary subscriber only and MUST redirect to the standby
+subscriber if the primary disconnects.</td>
+<td>MUST</td>
+</tr>
+<tr>
+<td><strong>Throughput Limit (<code>0x41</code>)</strong></td>
+<td>The broker MAY include a Throughput Limit property in CONNACK
+specifying the maximum KB/s the client is permitted to publish. If
+included, the broker MUST enforce this limit by refusing or delaying
+publishes that exceed it.</td>
+<td>MAY / MUST</td>
+</tr>
+</tbody>
+</table>
+<p>These six obligations define the complete broker contract. The MQTT
+6.0 Protocol Specification is thinner than the current draft precisely
+because everything below this line belongs in the Application
+Profile.</p>
+<hr />
+<h2 id="the-application-profile-layer-the-lift">3. The Application
+Profile Layer: The Lift</h2>
+<p>The <strong>MQTT Stream Application Profile</strong> defines client
+library behavior using the six protocol primitives above as building
+blocks. This is the layer that implements the reliability guarantees
+that industrial users actually need. The profile does not introduce new
+wire format; it specifies how client libraries MUST behave when
+processing protocol-layer signals.</p>
+<p>This is Simon’s “mux’ing” resolved: these behaviors are explicitly
+and formally designated as client library obligations, not protocol
+obligations.</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Behavior</th>
+<th>Application Profile Specification</th>
+<th>Normative Level</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Gap detection algorithm</strong></td>
+<td>The client library REQUIRES a check
+<code>received_seq == expected_seq</code> for each message delivered
+from a <code>$queue/</code>. On gap detection (received &gt; expected +
+1), the library MUST invoke the registered gap handler before delivering
+the out-of-sequence message to the application.</td>
+<td>REQUIRES</td>
+</tr>
+<tr>
+<td><strong>High-watermark tracking</strong></td>
+<td>The client library REQUIRES storing the last successfully processed
+Sequence Number per queue (O(1) state). The high-watermark is the
+reference point for gap detection, resume-from-position, and
+exactly-once deduplication for in-order delivery.</td>
+<td>REQUIRES</td>
+</tr>
+<tr>
+<td><strong>Epoch change handler</strong></td>
+<td>On CONNACK where the broker-supplied Epoch differs from the client’s
+stored Epoch for any queue, the client library MUST discard all stored
+idempotency state for that queue, update the stored Epoch, and trigger a
+resync before resuming consumption.</td>
+<td>MUST</td>
+</tr>
+<tr>
+<td><strong>Consumer state machine</strong></td>
+<td>The client library REQUIRES implementing a state machine with the
+following states: <code>CONNECTING</code>, <code>HANDSHAKING</code>
+(v6.0 capability exchange), <code>FETCHING</code>,
+<code>PROCESSING</code>, <code>ACKNOWLEDGING</code>,
+<code>RESYNCING</code>. The profile defines valid transitions and the
+conditions that trigger each.</td>
+<td>REQUIRES</td>
+</tr>
+<tr>
+<td><strong>Exactly-once processing workflow</strong></td>
+<td>The profile defines the sequence: (1) receive message, (2) check Seq
+against high-watermark, (3) if duplicate, send PUBACK and skip
+application delivery, (4) if new, deliver to application, (5) on
+application success, advance high-watermark, (6) send PUBACK. Step 5
+MUST occur before Step 6.</td>
+<td>REQUIRES</td>
+</tr>
+<tr>
+<td><strong>Reconnect and resume</strong></td>
+<td>On reconnect to a v6.0 broker, the client library REQUIRES including
+<code>last-seq</code> and <code>current-epoch</code> as CONNECT User
+Properties for each queue the client was consuming. The broker uses
+these values to resume delivery from the correct position.</td>
+<td>REQUIRES</td>
+</tr>
+<tr>
+<td><strong>Sequence wraparound</strong></td>
+<td>The client library MUST treat <code>Seq 0</code> following
+<code>Seq 0xFFFFFFFF</code> as a continuation, not a gap. If the broker
+increments the Epoch at wraparound, the library MUST handle this as an
+Epoch change event (see Epoch change handler above).</td>
+<td>MUST</td>
+</tr>
+<tr>
+<td><strong>FETCH batch sizing strategy</strong></td>
+<td>The profile RECOMMENDS an adaptive batch sizing strategy: start with
+<code>batch-size = 1</code>, double on successful processing, halve on
+slow processing (processing time exceeds a configurable threshold). This
+prevents the reconnect flood while allowing throughput to scale under
+stable conditions.</td>
+<td>RECOMMENDS</td>
+</tr>
+<tr>
+<td><strong>Idempotency table management</strong></td>
+<td>For in-order delivery (standard <code>$queue/</code> topics), the
+profile REQUIRES the high-watermark model (O(1) state). Set-based
+idempotency tables are RECOMMENDED only when the application requires
+out-of-order delivery guarantees. On Epoch reset, the profile REQUIRES
+discarding the entire idempotency table as a garbage-collection
+boundary.</td>
+<td>REQUIRES / RECOMMENDS</td>
+</tr>
+<tr>
+<td><strong>Consumer group coordination</strong></td>
+<td>The profile defines how to use SQMC <code>competing</code> mode for
+work-queue fan-out and <code>exclusive</code> mode for primary/standby
+failover. The profile also defines when application-level coordination
+is needed instead (e.g., cross-broker consumer groups spanning multiple
+<code>$queue/</code> instances require application-level partition
+assignment beyond what the protocol provides).</td>
+<td>REQUIRES / defers</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="how-this-addresses-committee-criticisms">4. How This Addresses
+Committee Criticisms</h2>
+<h3 id="simons-muxing-criticism">Simon’s “mux’ing” criticism</h3>
+<p><em>“There appears to be a mux’ing of what is expected of the
+application and what is expected of the protocol.”</em></p>
+<p>Option A resolves this directly. Section 2 of this document is a
+complete enumeration of broker obligations — the MQTT 6.0 Protocol
+Specification contains exactly and only those six items. Section 3 is a
+complete enumeration of client library obligations — every item that
+belongs at the application layer is explicitly placed in the Application
+Profile. The line is drawn and labeled. Simon is right that the current
+draft mixes these layers; Option A unmixes them.</p>
+<h3 id="the-this-should-be-application-level-argument">The “this should
+be application-level” argument</h3>
+<p>Simon’s implicit position — that gap detection, idempotency
+management, and consumer state machines belong in the application rather
+than the protocol — is <strong>correct</strong>, and Option A agrees
+with him. The Application Profile is precisely the document that
+specifies what IS at the application level. We are not pushing these
+behaviors into the protocol; we are standardizing them in their
+appropriate layer, using the Eclipse Foundation as the governing body
+(the same body that governs Sparkplug B, which already standardizes
+application-level sequencing on MQTT). The protocol spec stays narrow.
+The application behavior gets standardized where it belongs.</p>
+<h3 id="the-bloat-and-kafka-clone-criticism">The “bloat” and Kafka-clone
+criticism</h3>
+<p>The MQTT 6.0 Protocol Specification under Option A contains six
+broker primitives. The protocol document is noticeably thinner than the
+current combined draft. Implementers building a compliant v6.0 broker
+need only implement Section 2 of this document. They do not need to
+implement gap detection algorithms, consumer state machines, or
+idempotency table strategies — those are client library concerns that
+live in the Application Profile. A minimal v6.0 broker footprint is
+achievable; the protocol is not attempting to replicate Kafka’s consumer
+group coordinator.</p>
+<h3 id="the-standardize-now-vs.-extension-first-tension">The
+“standardize now vs. extension first” tension</h3>
+<p>Option A enables parallel standardization tracks that match the
+institutional capabilities of the appropriate governing bodies:</p>
+<ul>
+<li><strong>MQTT 6.0 Protocol Specification</strong> — OASIS. Six broker
+primitives, wire format, property IDs <code>0x30</code>,
+<code>0x35</code>, <code>0x41</code>. This is protocol engineering;
+OASIS is the right home.</li>
+<li><strong>MQTT Stream Application Profile</strong> — Eclipse
+Foundation, alongside Sparkplug B. Client library behavior, reference
+implementations, conformance test suites. This is application
+engineering; Eclipse Foundation already governs Sparkplug B and has the
+processes for this kind of document.</li>
+<li><strong>Reference implementation</strong> — HiveMQ Extension SDK for
+the broker side; an open-source client library (Python/Java/Go)
+implementing the Application Profile for the client side.</li>
+</ul>
+<p>Two tracks can advance simultaneously. If the OASIS process moves
+slowly, the Application Profile can be published and adopted while the
+protocol primitives are in draft. If the Application Profile needs
+revision (e.g., new batch sizing strategies emerge from production
+experience), it can be updated without reopening the OASIS protocol
+spec.</p>
+<hr />
+<h2 id="feature-split-comprehensive-reference-table">5. Feature Split:
+Comprehensive Reference Table</h2>
+<table>
+<colgroup>
+<col style="width: 18%" />
+<col style="width: 31%" />
+<col style="width: 31%" />
+<col style="width: 18%" />
+</colgroup>
+<thead>
+<tr>
+<th>Feature</th>
+<th style="text-align: center;">In MQTT 6.0 Protocol Spec?</th>
+<th style="text-align: center;">In MQTT Stream Application Profile?</th>
+<th>Who Implements</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>$queue/</code> durable persistence before PUBACK</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+<td>Broker</td>
+</tr>
+<tr>
+<td>Queue TTL and max-size enforcement</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+<td>Broker</td>
+</tr>
+<tr>
+<td>Stream Sequence Number assignment (<code>0x30</code>)</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+<td>Broker</td>
+</tr>
+<tr>
+<td>Stream Epoch signaling (<code>0x35</code>) in CONNACK</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+<td>Broker</td>
+</tr>
+<tr>
+<td>FETCH request handling / Virtual FETCH dispatch</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+<td>Broker</td>
+</tr>
+<tr>
+<td>SQMC competing-consumer dispatch (round-robin)</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+<td>Broker</td>
+</tr>
+<tr>
+<td>SQMC exclusive-consumer primary/standby failover</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+<td>Broker</td>
+</tr>
+<tr>
+<td>Throughput Limit enforcement (<code>0x41</code>)</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+<td>Broker</td>
+</tr>
+<tr>
+<td>v6.0 handshake (<code>mqtt-ext: v6.0</code> in CONNECT/CONNACK)</td>
+<td style="text-align: center;">Yes (detection only)</td>
+<td style="text-align: center;">Yes (fallback logic)</td>
+<td>Broker detects; client library handles fallback</td>
+</tr>
+<tr>
+<td>Gap detection algorithm</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">Yes</td>
+<td>Client library</td>
+</tr>
+<tr>
+<td>High-watermark state tracking</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">Yes</td>
+<td>Client library</td>
+</tr>
+<tr>
+<td>Epoch change handler (discard idempotency state)</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">Yes</td>
+<td>Client library</td>
+</tr>
+<tr>
+<td>Consumer state machine</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">Yes</td>
+<td>Client library</td>
+</tr>
+<tr>
+<td>Exactly-once processing workflow</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">Yes</td>
+<td>Client library</td>
+</tr>
+<tr>
+<td>Reconnect/resume with <code>last-seq</code> +
+<code>current-epoch</code></td>
+<td style="text-align: center;">No (wire format only)</td>
+<td style="text-align: center;">Yes (behavior)</td>
+<td>Client library</td>
+</tr>
+<tr>
+<td>Sequence wraparound handling</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">Yes</td>
+<td>Client library</td>
+</tr>
+<tr>
+<td>Adaptive FETCH batch sizing</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">Yes</td>
+<td>Client library</td>
+</tr>
+<tr>
+<td>Idempotency table strategy selection</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">Yes</td>
+<td>Client library</td>
+</tr>
+<tr>
+<td>Consumer group application-level coordination</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">Yes (scope limits defined)</td>
+<td>Application / client library</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="standardization-path">6. Standardization Path</h2>
+<pre><code>OASIS MQTT Technical Committee
+  └── MQTT 6.0 Protocol Specification (broker primitives)
+        Property 0x30 (Stream Sequence Number)
+        Property 0x35 (Stream Epoch)
+        Property 0x41 (Throughput Limit)
+        $queue/ persistence semantics
+        FETCH / Virtual FETCH broker behavior
+        SQMC broker dispatch semantics
+
+Eclipse Foundation (IoT Working Group)
+  └── MQTT Stream Application Profile v1.0
+        Gap detection algorithm
+        Consumer state machine
+        Epoch change handler
+        Exactly-once processing workflow
+        FETCH batch sizing strategy
+        Reconnect/resume behavior
+        Idempotency table management
+  └── Sparkplug B (existing — application-layer sequencing on MQTT v5.0)
+
+HiveMQ
+  └── Reference implementation — broker (HiveMQ Extension SDK)
+  └── Reference implementation — client (open-source, multi-language)
+  └── Conformance test suite (donated to Eclipse Foundation)</code></pre>
+<p>The OASIS submission can proceed with only the six protocol
+primitives, making the committee’s evaluation scope manageable. The
+Eclipse Foundation Application Profile can begin community review
+immediately, given the Eclipse Foundation’s lighter governance process
+relative to OASIS. The two documents reference each other normatively
+but are independently versioned.</p>
+<hr />
+<h2 id="trade-offs">7. Trade-offs</h2>
+<h3 id="advantages">Advantages</h3>
+<ul>
+<li><strong>Protocol spec is genuinely slimmer.</strong> The MQTT 6.0
+OASIS submission covers six broker primitives, not a full consumer
+lifecycle specification. Committee members evaluating “is this
+appropriate for a protocol spec?” are evaluating a narrower document
+with a cleaner answer.</li>
+<li><strong>Simon’s criticism is directly and structurally
+resolved.</strong> The mux’ing is eliminated by design. Every feature
+has a designated layer and a designated governing body.</li>
+<li><strong>Application Profile can evolve faster.</strong> If
+production experience reveals that the adaptive FETCH batch sizing
+strategy needs revision, the Eclipse Foundation can publish Application
+Profile v1.1 without reopening the OASIS protocol spec. Protocol
+stability and application-layer agility are decoupled.</li>
+<li><strong>Aligns with established precedent.</strong> Sparkplug B
+proves that the MQTT ecosystem already accepts this two-layer model. The
+Application Profile is not a novel concept; it is an explicit
+formalization of what Sparkplug B does informally.</li>
+<li><strong>Appropriate governing bodies.</strong> OASIS for wire format
+and broker obligations. Eclipse Foundation for client library behavior
+and reference implementations. Each body handles what it handles
+well.</li>
+</ul>
+<h3 id="disadvantages">Disadvantages</h3>
+<ul>
+<li><strong>Two documents to maintain.</strong> An implementer building
+a complete v6.0 consumer must read and conform to both the protocol spec
+and the Application Profile. Cross-document consistency must be actively
+managed.</li>
+<li><strong>Risk of Application Profile fragmentation.</strong> If the
+Application Profile is not adopted widely, client libraries may
+implement the protocol primitives but diverge on the consumer state
+machine, gap detection, and idempotency strategies. This is the same
+fragmentation risk that motivated the proposal in the first place, now
+shifted one layer up. Mitigation: the reference implementation and
+conformance test suite must be published simultaneously with the
+Application Profile.</li>
+<li><strong>Compliance testing is split.</strong> A “fully compliant
+v6.0 system” requires broker conformance to the protocol spec AND client
+library conformance to the Application Profile. Test harnesses must
+cover both layers. This is more complex than a single combined
+conformance suite.</li>
+</ul>
+<hr />
+<h2 id="references-1">References</h2>
+<ul>
+<li>Simon’s committee review feedback — quoted directly in
+<code>docs/rebuttals.md</code>, Section: “This Should Be Handled at the
+Application Level”</li>
+<li><code>docs/rebuttals.md</code> — full point-by-point responses to
+Georg and Simon</li>
+<li><code>docs/critiques-and-rebuttals.md</code> — technical pitfalls
+and mitigations (idempotency table growth, sequence wraparound, Epoch
+DoS)</li>
+<li><code>docs/spec/mqtt-v6.0-spec.md</code> — current combined
+specification (the document that Option A proposes splitting)</li>
+<li><a href="https://sparkplug.eclipse.org/specification/">Eclipse
+Sparkplug B Specification</a> — the governing precedent for this
+two-layer model</li>
+<li><a
+href="https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html">MQTT
+v5.0 OASIS Standard</a> — protocol layer reference</li>
+</ul>
+<h1
+id="option-b-mqtt-6.0-with-normative-client-annex-explicit-layer-boundary">Option
+B: MQTT 6.0 with Normative Client Annex — Explicit Layer Boundary</h1>
+<p><strong>Author:</strong> Bill Sommers, AI Solutions Lead, HiveMQ,
+Inc. <strong>Date:</strong> March 2026 <strong>Status:</strong> Proposal
+— For Committee Review</p>
+<hr />
+<h2 id="overview-1">1. Overview</h2>
+<h3 id="the-problem-with-the-current-spec-structure">The Problem With
+the Current Spec Structure</h3>
+<p>The current <code>mqtt-v6.0-spec.md</code> interleaves two distinct
+categories of normative obligation throughout its sections. Section 3.1
+specifies what a client MUST include in CONNECT; Section 4.3.3 specifies
+what a client MUST do on reconnect; Section 4.3.4 specifies how a client
+MUST manage its idempotency table. These are client library behaviors.
+Section 4.1.1 specifies what a broker MUST do with storage before
+issuing PUBACK; Section 4.3.1 specifies what a broker MUST do with a
+distributed sequence counter; Section 4.4.1 specifies how a broker MUST
+handle message locking. These are broker behaviors. Both categories
+appear in the same numbered sections, often in adjacent subsections,
+with no structural signal to the reader that they represent different
+contractual parties.</p>
+<p>This is the source of Simon’s “mux’ing” criticism: <em>“There appears
+to be a mux’ing of what is expected of the application and what is
+expected of the protocol.”</em> The criticism is accurate. The spec is
+not wrong in content, but it is ambiguous in structure.</p>
+<h3 id="the-option-b-solution">The Option B Solution</h3>
+<p>Option B retains the single-document structure — one OASIS submission
+— but reorganizes the content to make the architectural boundary
+explicit. The main body (Sections 1–7) becomes broker normative
+requirements only. A new <strong>Annex A (normative)</strong> collects
+all client library MUST/SHOULD behaviors. The existing code examples and
+informative implementation guidance move to <strong>Annex B
+(informative)</strong>.</p>
+<p>The analogy is instructive: MQTT v5.0 itself has a main body defining
+the protocol and informative annexes providing implementation guidance.
+Option B promotes client behavior from informative to normative, and
+separates it from broker behavior by document structure rather than by
+convention.</p>
+<p>This is not a reduction in scope. All five v6.0 features remain. The
+total set of normative requirements is unchanged. What changes is their
+organization: a reader evaluating broker conformance reads Sections 1–7.
+A reader implementing a client library reads Annex A. The mux’ing is
+resolved by separation within the document.</p>
+<hr />
+<h2 id="proposed-spec-restructure">2. Proposed Spec Restructure</h2>
+<p>The reorganization maps the current spec content to three structural
+zones:</p>
+<table>
+<colgroup>
+<col style="width: 17%" />
+<col style="width: 20%" />
+<col style="width: 34%" />
+<col style="width: 28%" />
+</colgroup>
+<thead>
+<tr>
+<th>Zone</th>
+<th>Scope</th>
+<th>Normative?</th>
+<th>Audience</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Sections 1–7 (main body)</strong></td>
+<td>Broker obligations only</td>
+<td>Yes</td>
+<td>Broker implementers, OASIS committee</td>
+</tr>
+<tr>
+<td><strong>Annex A</strong></td>
+<td>Stream client library obligations</td>
+<td>Yes</td>
+<td>Client library authors</td>
+</tr>
+<tr>
+<td><strong>Annex B</strong></td>
+<td>Example implementations, code patterns</td>
+<td>No (informative)</td>
+<td>Application developers</td>
+</tr>
+</tbody>
+</table>
+<p>Current content moves as follows:</p>
+<h3
+id="sections-17-broker-normative-unchanged-scope-tightened-audience">Sections
+1–7 (Broker Normative — Unchanged Scope, Tightened Audience)</h3>
+<ul>
+<li>Section 1: Introduction, conformance, terminology — retained
+as-is</li>
+<li>Section 2: Wire format, property IDs, packet types — retained;
+client-side property interpretation moves to Annex A</li>
+<li>Section 3: CONNECT/CONNACK/PUBLISH/SUBSCRIBE/FETCH packet
+specifications — broker-side processing only; client-side obligations
+(what to send, when, with what values) move to Annex A</li>
+<li>Section 4: Operational behavior — <code>$queue/</code> persistence,
+ordering, FETCH handling, Epoch management, SQMC mechanics — broker
+obligations only</li>
+<li>Section 5: v5.0 vs. v6.0 comparison table — retained</li>
+<li>Section 6: Compatibility Layer — broker-side compat mode
+requirements</li>
+<li>Section 7: Security Considerations — retained as-is</li>
+</ul>
+<h3
+id="annex-a-normative-stream-client-implementation-requirements">Annex A
+(Normative) — Stream Client Implementation Requirements</h3>
+<p>New section. Contains all client library MUST/SHOULD behaviors
+currently scattered through Sections 3 and 4. See Section 3 of this
+document for the complete content specification.</p>
+<h3 id="annex-b-informative-implementation-examples">Annex B
+(Informative) — Implementation Examples</h3>
+<p>Existing Annex A (SECS/GEM Mapping) moves here. Python shim examples,
+Java HiveMQ extension patterns, and the Protobuf schemas currently in
+<code>src/</code> are referenced here as non-normative implementation
+guidance.</p>
+<hr />
+<h2 id="annex-a-content-what-gets-lifted">3. Annex A Content: What Gets
+Lifted</h2>
+<p>Annex A is titled <strong>“Stream Client Implementation
+Requirements”</strong> and opens with the following normative
+statement:</p>
+<blockquote>
+<p>A conformant Stream Client implementation MUST implement all
+MUST-level requirements in this Annex. Failure to implement these
+requirements results in undefined behavior with respect to exactly-once
+processing, gap detection, and epoch-safe resumption.</p>
+</blockquote>
+<h3 id="a.1-stream-consumer-state-machine">A.1 Stream Consumer State
+Machine</h3>
+<p>The client library MUST implement the following states and
+transitions for each <code>$queue/</code> subscription:</p>
+<pre><code>States: {CONNECTING, HANDSHAKING, FETCHING, PROCESSING, ACKNOWLEDGING, RESYNCING}
+
+CONNECTING     -&gt; HANDSHAKING   : CONNACK received with mqtt-ext: v6.0 confirmed
+HANDSHAKING    -&gt; FETCHING      : Epoch check complete (see A.4); FETCH issued
+HANDSHAKING    -&gt; RESYNCING     : Epoch in CONNACK != stored Epoch
+FETCHING       -&gt; PROCESSING    : PUBLISH batch received from broker
+PROCESSING     -&gt; ACKNOWLEDGING : Business logic complete for message N
+ACKNOWLEDGING  -&gt; FETCHING      : PUBACK sent; batch exhausted or next FETCH issued
+ACKNOWLEDGING  -&gt; PROCESSING    : Next message in batch available (batch not yet exhausted)
+RESYNCING      -&gt; FETCHING      : Application confirms new high-watermark; Epoch stored
+Any state      -&gt; CONNECTING    : TCP disconnect or DISCONNECT packet received</code></pre>
+<p>The client MUST NOT issue a FETCH request from any state other than
+FETCHING. The client MUST NOT process messages from any state other than
+PROCESSING.</p>
+<h3 id="a.2-gap-detection">A.2 Gap Detection</h3>
+<p>The client MUST maintain a variable <code>expected_seq</code> per
+subscribed <code>$queue/{name}</code>, initialized to
+<code>last_stored_hwm + 1</code> on connect (or <code>1</code> on first
+connect).</p>
+<p>On receipt of each PUBLISH from a <code>$queue/</code> topic:</p>
+<ol type="1">
+<li>If <code>received_seq == expected_seq</code>: proceed to processing;
+set <code>expected_seq = received_seq + 1</code></li>
+<li>If <code>received_seq &gt; expected_seq</code>: a gap exists between
+<code>expected_seq</code> and <code>received_seq - 1</code>. The client
+MUST invoke the application’s registered gap handler before processing
+<code>received_seq</code>. The gap handler MAY choose to halt,
+reconcile, or log-and-continue — this is application policy. The client
+library MUST NOT silently skip the gap.</li>
+<li>If <code>received_seq &lt; expected_seq</code>: the message is a
+duplicate (already processed). The client MUST send PUBACK but MUST NOT
+re-execute business logic. The client MUST NOT update
+<code>expected_seq</code>.</li>
+</ol>
+<h3 id="a.3-high-watermark-management">A.3 High-Watermark
+Management</h3>
+<p>The client MUST persist the last successfully processed Stream
+Sequence Number per <code>$queue/{name}</code> as the
+<strong>High-Watermark</strong> (<code>hwm</code>). Persistence MUST be
+durable (survives process restart). The atomicity requirement: the
+High-Watermark update and the business-logic side effect MUST succeed or
+fail together. If the High-Watermark cannot be persisted, the client
+MUST NOT send PUBACK.</p>
+<p>The client SHOULD use the High-Watermark as the
+<code>v6-last-seq</code> User Property value in CONNECT on reconnect.
+This enables the broker to resume delivery from <code>hwm + 1</code>
+without re-delivering already-processed messages.</p>
+<p>For in-order <code>$queue/</code> delivery (the normal case), the
+High-Watermark model is O(1) in storage. A set-based idempotency table
+is only required when the application enables delivery modes that can
+produce out-of-order receipt (not the default).</p>
+<h3 id="a.4-epoch-change-protocol">A.4 Epoch Change Protocol</h3>
+<p>On receiving CONNACK, the client MUST compare the Epoch value in
+CONNACK against its stored Epoch for each subscribed
+<code>$queue/{name}</code>.</p>
+<p>If <code>connack_epoch != stored_epoch</code>:</p>
+<ol type="1">
+<li>The client MUST discard its local idempotency state for the affected
+queue (High-Watermark, <code>expected_seq</code>, and any set-based
+dedup table)</li>
+<li>The client MUST log the Epoch change with: timestamp, queue name,
+previous Epoch value, new Epoch value</li>
+<li>The client MUST invoke the application’s registered epoch-change
+handler and MUST wait for it to return a new high-watermark before
+transitioning to FETCHING</li>
+<li>The client MUST store the new Epoch before issuing any FETCH
+request</li>
+<li>The client MUST NOT attempt to use sequence numbers from the
+previous Epoch for deduplication</li>
+</ol>
+<p>If <code>connack_epoch == stored_epoch</code>, the client MAY proceed
+directly to the FETCHING state using its stored High-Watermark.</p>
+<h3 id="a.5-reconnect-and-resume">A.5 Reconnect and Resume</h3>
+<p>The client SHOULD include the following User Properties in CONNECT
+after any disconnection from a queue it was consuming:</p>
+<ul>
+<li><code>v6-last-seq</code>: the decimal string of the stored
+High-Watermark for the most recently consumed queue</li>
+<li><code>v6-epoch</code>: the decimal string of the stored Epoch for
+that queue</li>
+</ul>
+<p>If multiple queues are active, the client SHOULD send one
+<code>v6-last-seq</code>/<code>v6-epoch</code> pair per queue using
+repeated User Properties keyed by queue name (e.g.,
+<code>v6-last-seq:$queue/line_1</code>).</p>
+<p>The client MUST NOT send a <code>v6-last-seq</code> value that has
+not been durably persisted. Reporting a false high-watermark (higher
+than the true last processed sequence) causes silent message loss.</p>
+<h3 id="a.6-fetch-pacing-strategy">A.6 FETCH Pacing Strategy</h3>
+<p>The client MUST NOT issue overlapping FETCH requests for the same
+<code>$queue/{name}</code>. A FETCH is outstanding from the moment it is
+sent until the full batch has been acknowledged (all PUBACKs sent for
+the batch).</p>
+<p>The RECOMMENDED initial batch size is 1. The RECOMMENDED pacing
+algorithm is additive doubling on success: if a batch of N is fully
+processed without error, the next FETCH MAY use batch size 2N, up to a
+configurable maximum. On processing error, the client SHOULD reduce
+batch size to 1 and re-FETCH from the last acknowledged sequence.</p>
+<p>The client MAY issue the next FETCH before the current batch is fully
+acknowledged, provided the outstanding FETCH is for the immediately
+following sequence range (pipelining). The client MUST track which
+sequences are outstanding across pipelined requests.</p>
+<h3 id="a.7-idempotency-table-lifecycle">A.7 Idempotency Table
+Lifecycle</h3>
+<p>The High-Watermark (Section A.3) is sufficient for exactly-once
+processing under in-order delivery, which is the invariant provided by
+<code>$queue/</code> ordered delivery. The client SHOULD use the
+High-Watermark model and SHOULD NOT maintain a set-based idempotency
+table unless the application explicitly requires processing of
+out-of-order delivery.</p>
+<p>If a set-based table is used, the client MUST garbage-collect entries
+with sequence numbers at or below the current High-Watermark. Epoch
+changes (Section A.4) are natural garbage-collection boundaries: the
+client MUST discard the entire set on Epoch change.</p>
+<p>The client MUST NOT allow the idempotency table to grow without
+bound. If set size exceeds a configurable threshold, the client SHOULD
+log a warning and SHOULD trigger a manual reconciliation request.</p>
+<h3 id="a.8-sequence-wraparound">A.8 Sequence Wraparound</h3>
+<p>The 32-bit Stream Sequence Number space is exhausted at
+<code>0xFFFFFFFF</code>. The client MUST treat <code>Seq 0</code>
+received after <code>Seq 0xFFFFFFFF</code> as a valid continuation, not
+as a gap. The broker MUST couple wraparound with an Epoch increment (per
+Section 4.3.2.2 of the main body); the client’s Epoch change protocol
+(Section A.4) handles the state reset automatically.</p>
+<p>The client MUST NOT treat a sequence gap of magnitude
+<code>0xFFFFFFFF</code> or greater as evidence of missing messages; it
+MUST instead treat it as evidence of a wraparound event and proceed
+through the Epoch change protocol.</p>
+<hr />
+<h2 id="how-this-addresses-committee-criticisms-1">4. How This Addresses
+Committee Criticisms</h2>
+<h3 id="simons-muxing-criticism-1">Simon’s “Mux’ing” Criticism</h3>
+<blockquote>
+<p>“There appears to be a mux’ing of what is expected of the application
+and what is expected of the protocol.”</p>
+</blockquote>
+<p><strong>Option B response:</strong> The Annex A boundary makes the
+separation explicit and auditable within the document. Sections 1–7
+(main body) = broker contract. Annex A = client contract. The mux’ing is
+resolved by structural separation within the spec. A committee member
+evaluating broker conformance reads through Section 7 and stops. A
+committee member evaluating client library conformance reads Annex A.
+The two audiences no longer read the same section headers as addressing
+them both.</p>
+<h3 id="the-application-level-argument">The “Application-Level”
+Argument</h3>
+<blockquote>
+<p>The objection that gap detection, epoch handling, and consumer state
+management are application-level concerns and should not be in a
+protocol spec.</p>
+</blockquote>
+<p><strong>Option B response:</strong> Annex A acknowledges this
+directly. Gap detection, Epoch handling, and consumer state management
+ARE application-layer responsibilities — they are normative requirements
+on the <strong>client library</strong>, not on the broker, and they are
+placed in an Annex explicitly to signal this. The main body does not
+require applications to manage sequence state; it requires a conformant
+client library to do so. This mirrors how MQTT v5.0 itself specifies
+client behavior (QoS retry, session resumption) separately from broker
+behavior, without those client behaviors being “mixed into” broker
+sections.</p>
+<h3 id="procedural-argument">Procedural Argument</h3>
+<blockquote>
+<p>The concern that two separate documents (a hypothetical Option A
+split) create submission and versioning complexity at OASIS.</p>
+</blockquote>
+<p><strong>Option B response:</strong> A single document is easier to
+submit to OASIS as one coherent standard. The committee evaluates broker
+and client behavior together in a single review cycle. There is no
+synchronization risk between two documents, no question of which version
+of a client spec corresponds to which version of a broker spec, and no
+procedural ambiguity about whether Annex A is binding.</p>
+<h3 id="the-bloat-criticism">The “Bloat” Criticism</h3>
+<blockquote>
+<p>“MQTT’s success is its simplicity. v6.0 turns it into a bloated Kafka
+clone.” (Criticism 1 in <code>critiques-and-rebuttals.md</code>)</p>
+</blockquote>
+<p><strong>Option B response:</strong> The main body, after
+restructuring, contains only broker obligations. Sections 1–7 are
+trimmed of all client-side MUST/SHOULD language, which moves to Annex A.
+The perceived bloat was the interleaving — a reader scanning the main
+body encountered client library state machine requirements alongside
+broker wire-format requirements. After restructuring, the main body is
+visibly shorter and more focused. The total normative content is
+unchanged, but each section addresses a single audience.</p>
+<hr />
+<h2 id="comparison-current-spec-vs.-option-b-structure">5. Comparison:
+Current Spec vs. Option B Structure</h2>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>Spec Content</th>
+<th>Current Location</th>
+<th>Option B Location</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Property IDs 0x30, 0x35, 0x41, 0x42 wire format</td>
+<td>Section 2.2</td>
+<td>Section 2.2 (unchanged)</td>
+<td>Normative</td>
+</tr>
+<tr>
+<td>FETCH packet structure</td>
+<td>Section 3.5</td>
+<td>Section 3.5 (unchanged)</td>
+<td>Normative</td>
+</tr>
+<tr>
+<td>Broker: assign Seq before PUBACK</td>
+<td>Section 4.1.1</td>
+<td>Section 4.1.1 (unchanged)</td>
+<td>Normative</td>
+</tr>
+<tr>
+<td>Broker: Epoch increment conditions</td>
+<td>Section 4.3.2.2</td>
+<td>Section 4.3.2.2 (unchanged)</td>
+<td>Normative</td>
+</tr>
+<tr>
+<td>Broker: SQMC message locking</td>
+<td>Section 4.4.1</td>
+<td>Section 4.4.1 (unchanged)</td>
+<td>Normative</td>
+</tr>
+<tr>
+<td><strong>Client: send v6-last-seq in CONNECT</strong></td>
+<td>Section 3.1 (mixed)</td>
+<td><strong>Annex A.5</strong></td>
+<td>Normative</td>
+</tr>
+<tr>
+<td><strong>Client: discard idempotency on Epoch change</strong></td>
+<td>Section 2.2.2 (mixed)</td>
+<td><strong>Annex A.4</strong></td>
+<td>Normative</td>
+</tr>
+<tr>
+<td><strong>Client: High-Watermark persistence</strong></td>
+<td>Section 4.3.4 (mixed)</td>
+<td><strong>Annex A.3</strong></td>
+<td>Normative</td>
+</tr>
+<tr>
+<td><strong>Client: gap detection algorithm</strong></td>
+<td>Section 4.3.4 (implicit)</td>
+<td><strong>Annex A.2</strong></td>
+<td>Normative</td>
+</tr>
+<tr>
+<td><strong>Client: FETCH pacing</strong></td>
+<td>Not specified</td>
+<td><strong>Annex A.6</strong></td>
+<td>Normative</td>
+</tr>
+<tr>
+<td><strong>Client: state machine</strong></td>
+<td>Not specified</td>
+<td><strong>Annex A.1</strong></td>
+<td>Normative</td>
+</tr>
+<tr>
+<td><strong>Client: sequence wraparound handling</strong></td>
+<td><code>critiques-and-rebuttals.md</code> Pitfall 1 (informative)</td>
+<td><strong>Annex A.8</strong></td>
+<td>Normative</td>
+</tr>
+<tr>
+<td>SECS/GEM mapping</td>
+<td>Annex A (current)</td>
+<td>Annex B (informative)</td>
+<td>Informative</td>
+</tr>
+<tr>
+<td>Python/Java code examples</td>
+<td><code>src/</code> directory</td>
+<td>Annex B (informative)</td>
+<td>Informative</td>
+</tr>
+<tr>
+<td>Protobuf schemas</td>
+<td><code>src/</code> directory</td>
+<td>Annex B (informative)</td>
+<td>Informative</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="trade-offs-1">6. Trade-offs</h2>
+<h3 id="pros-4">Pros</h3>
+<ul>
+<li><strong>Single OASIS submission.</strong> One document, one
+submission, one review cycle. No fragmentation risk between a broker
+spec and a client spec.</li>
+<li><strong>Full system evaluated together.</strong> The committee sees
+both broker and client obligations in one pass. The interaction between
+broker Epoch propagation (Section 4.3.2.3) and client Epoch change
+protocol (Annex A.4) is visible in context.</li>
+<li><strong>No new scope.</strong> All five v6.0 features are preserved.
+Annex A collects and formalizes client obligations that are already
+implied by the current spec; it does not add new ones.</li>
+<li><strong>Addresses Simon’s criticism directly.</strong> The mux’ing
+is resolved by the Annex boundary without splitting the document.</li>
+<li><strong>Lighter main body.</strong> Sections 1–7 become visibly more
+focused after client-side MUST language is lifted to Annex A.</li>
+</ul>
+<h3 id="cons-4">Cons</h3>
+<ul>
+<li><strong>Annex A is still in the spec.</strong> Committee members who
+object to the total scope (gap detection, state machine, epoch handling
+in a protocol spec) will still see it. Option B separates it
+structurally; it does not remove it. If the objection is to scope rather
+than to presentation, Option B does not fully resolve it.</li>
+<li><strong>Client library improvements require OASIS revision.</strong>
+Because Annex A is normative and inside the spec, any update to client
+library MUST/SHOULD requirements (e.g., adding a new state to the state
+machine, or revising the FETCH pacing algorithm) requires a formal OASIS
+revision cycle. This is slower than maintaining a separate client
+implementation guide.</li>
+<li><strong>Less clean than a full split.</strong> Option A (a separate
+client implementation specification document) would provide a more
+complete architectural separation. Option B is a compromise — it draws
+the boundary explicitly, but both sides of the boundary remain in the
+same document.</li>
+</ul>
+<hr />
+<h2 id="what-the-main-body-sections-17-looks-like-after-restructure">7.
+What the Main Body (Sections 1–7) Looks Like After Restructure</h2>
+<p>After lifting all client-side MUST/SHOULD language to Annex A, the
+main body sections become:</p>
+<p><strong>Section 1 — Introduction and Conformance:</strong> Unchanged.
+Conformance criteria updated to reference Annex A for client library
+conformance.</p>
+<p><strong>Section 2 — Wire Format:</strong> Broker-only: property ID
+assignments, data types, packet type definitions. Client-side property
+interpretation (e.g., “a client that receives an Epoch value greater
+than its stored Epoch MUST…”) moves to Annex A.4.</p>
+<p><strong>Section 3 — Control Packets:</strong> Broker-only processing
+rules for CONNECT, CONNACK, PUBLISH, SUBSCRIBE, FETCH. What the broker
+MUST validate, reject, or respond to. Client-side sending obligations
+(what values to populate, when) move to Annex A.5.</p>
+<p><strong>Section 4 — Operational Behavior:</strong> Broker-only:
+<code>$queue/</code> persistence contract, Epoch increment conditions
+and propagation, SQMC locking semantics. The “Exactly-Once Processing”
+subsection (Section 4.3.4) moves entirely to Annex A, as it describes
+client library behavior with no broker obligation.</p>
+<p><strong>Section 5 — Summary of Changes:</strong> Unchanged comparison
+table.</p>
+<p><strong>Section 6 — Compatibility Layer:</strong> Broker-side compat
+mode requirements. Client-side compat mode behavior (which User Property
+to send instead of which native property) moves to Annex A.</p>
+<p><strong>Section 7 — Security Considerations:</strong> Unchanged.
+Sections 7.3 and 7.4 (Sequence Number Side-Channel and High-Watermark
+Persistence) move to Annex A, as both describe client implementation
+obligations.</p>
+<p>The result is a main body of roughly 60–70% of the current length,
+with all remaining content directly addressing broker implementers. The
+substantive content removed from the main body does not disappear — it
+becomes the formally bounded client contract in Annex A.</p>
+<hr />
+<h2 id="references-2">References</h2>
+<ul>
+<li>MQTT v5.0 OASIS Standard:
+https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html</li>
+<li>Current v6.0 specification:
+<code>docs/spec/mqtt-v6.0-spec.md</code></li>
+<li>Standards committee criticisms: <code>docs/rebuttals.md</code>,
+<code>docs/critiques-and-rebuttals.md</code></li>
+</ul>
+<h1
+id="option-c-two-independent-specifications-mqtt-6.0-transport-extension-mqtt-stream-1.0-application-protocol">Option
+C: Two Independent Specifications — MQTT 6.0 Transport Extension + MQTT
+Stream 1.0 Application Protocol</h1>
+<blockquote>
+<p><strong>Author:</strong> Bill Sommers, AI Solutions Lead, HiveMQ,
+Inc. <strong>Date:</strong> March 2026 <strong>Status:</strong> Proposal
+— for standards committee review</p>
+</blockquote>
+<hr />
+<h2 id="overview-2">1. Overview</h2>
+<p>Option C is the maximum-separation answer to the committee’s
+structural criticisms. It dissolves the layering ambiguity by making the
+boundary absolute and architectural: two distinct specifications,
+governed independently, versioned independently, with a clean
+contractual interface between them.</p>
+<p><strong>MQTT 6.0</strong> becomes a minimal wire-format extension
+specification. It defines new property IDs, the <code>$queue/</code>
+namespace semantics, and broker-side behavioral requirements. It
+contains no client behavioral requirements beyond what is necessary to
+negotiate the extension. It does not define state machines,
+gap-detection algorithms, epoch-handling procedures, or application
+patterns. It is a transport extension, not an application protocol.</p>
+<p><strong>MQTT Stream 1.0</strong> is a separate specification that
+defines the industrial reliability application protocol built on top of
+MQTT 6.0. It defines the consumer state machine, the gap-detection
+algorithm, the epoch-resync procedure, the exactly-once delivery
+contract, and FETCH pacing strategies. It references MQTT 6.0 as its
+required transport layer. It is to MQTT 6.0 what Sparkplug B is to MQTT
+3.1.1 — an application-layer profile that leverages the transport
+primitives without being conflated with them.</p>
+<p>This is not a novel pattern. The protocol ecosystem has used it for
+decades:</p>
+<ul>
+<li>TCP/IP defines reliable byte-stream delivery. HTTP defines an
+application protocol for document transfer over TCP.</li>
+<li>MQTT 3.1.1 defines a lightweight pub/sub transport. Sparkplug B
+defines an application protocol for industrial telemetry over MQTT.</li>
+<li>CoAP defines a constrained application protocol over UDP. LwM2M
+defines a device management application protocol over CoAP.</li>
+</ul>
+<p>Option C places MQTT 6.0 and MQTT Stream 1.0 in that same
+well-understood relationship. The transport layer provides primitives.
+The application layer defines what to do with them.</p>
+<hr />
+<h2 id="mqtt-6.0-transport-extension-specification">2. MQTT 6.0
+Transport Extension Specification</h2>
+<p>The MQTT 6.0 spec is a <strong>broker-only behavioral
+specification</strong>. It defines what a conformant broker MUST do. It
+imposes no normative requirements on client application logic.</p>
+<h3 id="what-mqtt-6.0-defines">2.1 What MQTT 6.0 Defines</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Specification Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Property 0x30: Stream Sequence Number</strong></td>
+<td>Four Byte Integer. A conformant broker MUST assign a monotonically
+increasing, per-<code>$queue/</code>, cluster-wide sequence number to
+every message it persists. The broker MUST include Property 0x30 in the
+PUBLISH delivered to consumers. Clients MUST NOT set this property; if
+present in a client PUBLISH, the broker MUST overwrite it.</td>
+</tr>
+<tr>
+<td><strong>Property 0x35: Stream Epoch</strong></td>
+<td>Two Byte Integer. A conformant broker MUST include this property in
+CONNACK when the client presents a <code>last-seq</code> in CONNECT. If
+the broker cannot guarantee sequence continuity from
+<code>last-seq</code> to the current queue head, it MUST set a new Epoch
+value. What constitutes “cannot guarantee” is implementation-defined;
+the signal is normative, the trigger is not.</td>
+</tr>
+<tr>
+<td><strong>Property 0x41: Throughput Limit</strong></td>
+<td>Four Byte Integer (KB/s). A conformant broker MAY include this
+property in CONNACK to enforce a per-connection bandwidth ceiling.
+Client behavior upon receiving this property is advisory only from the
+MQTT 6.0 perspective; MQTT Stream 1.0 defines normative client
+handling.</td>
+</tr>
+<tr>
+<td><strong><code>$queue/</code> Namespace</strong></td>
+<td>A conformant broker MUST persist a message published to a
+<code>$queue/</code> topic to non-volatile storage before sending PUBACK
+to the publisher. A <code>$queue/</code> entity MUST exist independently
+of any client session. A conformant broker MUST NOT discard a
+<code>$queue/</code> message because all consumers are
+disconnected.</td>
+</tr>
+<tr>
+<td><strong>Virtual FETCH</strong></td>
+<td>A conformant broker MUST support pull-based delivery via PUBLISH to
+<code>$SYS/queues/{name}/fetch</code> with <code>batch-size</code> User
+Property. The broker MUST hold messages in the queue until a FETCH is
+received; it MUST NOT push messages to a <code>$queue/</code> consumer
+except in response to a FETCH.</td>
+</tr>
+<tr>
+<td><strong>SQMC Semantics</strong></td>
+<td>A conformant broker MUST honor the <code>v6-semantics</code> User
+Property in SUBSCRIBE. <code>competing</code> mode: broker distributes
+each message to exactly one consumer in the group.
+<code>exclusive</code> mode: broker delivers all messages to a single
+designated consumer; on that consumer’s disconnect, the broker MUST
+transfer delivery to the next-eligible subscriber without message
+loss.</td>
+</tr>
+<tr>
+<td><strong>v6.0 Handshake</strong></td>
+<td>A client signals v6.0 support by including
+<code>User Property: ("mqtt-ext", "v6.0")</code> in CONNECT. A
+conformant broker MUST echo this property in CONNACK. A client that does
+not receive the echo MUST NOT use <code>$queue/</code> topics or rely on
+Property 0x30/0x35 semantics.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="what-mqtt-6.0-explicitly-does-not-define">2.2 What MQTT 6.0
+Explicitly Does NOT Define</h3>
+<p>The following are out of scope for the MQTT 6.0 transport extension
+spec:</p>
+<ul>
+<li>How clients detect sequence gaps</li>
+<li>How clients respond to an Epoch change</li>
+<li>The client-side consumer state machine</li>
+<li>Exactly-once delivery guarantees at the application layer</li>
+<li>The high-watermark persistence protocol</li>
+<li>FETCH batch-size selection algorithms or pipelining strategies</li>
+<li>The reconnect protocol (what <code>last-seq</code> and
+<code>current-epoch</code> values clients SHOULD present in
+CONNECT)</li>
+<li>Sequence wraparound handling at the client side</li>
+<li>Application patterns for competing vs. exclusive consumer modes</li>
+</ul>
+<p>These belong to MQTT Stream 1.0.</p>
+<hr />
+<h2 id="mqtt-stream-1.0-application-protocol-specification">3. MQTT
+Stream 1.0 Application Protocol Specification</h2>
+<p>MQTT Stream 1.0 is an application-layer protocol specification that
+references MQTT 6.0 as its required transport extension. A conformant
+MQTT Stream 1.0 client library implements all of the following
+normatively.</p>
+<h3 id="stream-consumer-state-machine">3.1 Stream Consumer State
+Machine</h3>
+<p>A conformant client MUST implement the following FSM:</p>
+<pre><code>CONNECTING → HANDSHAKING → FETCHING → PROCESSING → ACKNOWLEDGING
+                ↑                                        |
+                └──────────── RESYNCING ←────────────────┘
+                                  ↑
+                          (Epoch change detected)</code></pre>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>State</th>
+<th>Entry Condition</th>
+<th>Exit Condition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CONNECTING</td>
+<td>Client initiates TCP/TLS connection</td>
+<td>CONNACK received</td>
+</tr>
+<tr>
+<td>HANDSHAKING</td>
+<td>CONNACK received</td>
+<td>Broker echoes <code>mqtt-ext: v6.0</code>; client loads persisted
+high-watermark</td>
+</tr>
+<tr>
+<td>FETCHING</td>
+<td>HANDSHAKING complete</td>
+<td>FETCH sent; batch received</td>
+</tr>
+<tr>
+<td>PROCESSING</td>
+<td>Batch received</td>
+<td>All messages in batch processed by application</td>
+</tr>
+<tr>
+<td>ACKNOWLEDGING</td>
+<td>Processing complete</td>
+<td>PUBACK sent for all batch messages; high-watermark advanced</td>
+</tr>
+<tr>
+<td>RESYNCING</td>
+<td>Epoch in CONNACK differs from client’s stored epoch</td>
+<td>Client discards idempotency state, resets high-watermark, returns to
+HANDSHAKING</td>
+</tr>
+</tbody>
+</table>
+<h3 id="gap-detection-protocol">3.2 Gap Detection Protocol</h3>
+<p>A conformant client MUST implement the following algorithm on each
+received message:</p>
+<ol type="1">
+<li>Let <code>expected_seq</code> = <code>high_watermark + 1</code></li>
+<li>Let <code>received_seq</code> = Property 0x30 of the received
+PUBLISH</li>
+<li>If <code>received_seq == expected_seq</code>: advance
+<code>high_watermark</code>, process message, go to step 1</li>
+<li>If <code>received_seq &gt; expected_seq</code>: a gap exists. The
+client MUST NOT process messages beyond the gap. The client MUST send a
+gap notification to the application layer with
+<code>(expected_seq, received_seq - 1, queue_name)</code>. The client
+MAY request gap-fill (implementation-defined recovery) or enter
+RESYNCING</li>
+<li>If <code>received_seq &lt; expected_seq</code>: duplicate. The
+client MUST silently discard the message without advancing
+<code>high_watermark</code> or notifying the application</li>
+</ol>
+<h3 id="epoch-resync-protocol">3.3 Epoch Resync Protocol</h3>
+<p>On receiving a CONNACK where Property 0x35 differs from the client’s
+stored epoch:</p>
+<ol type="1">
+<li>Log the epoch transition with stored epoch, new epoch, queue name,
+and timestamp</li>
+<li>Discard the entire in-memory idempotency state for the affected
+queue(s)</li>
+<li>Reset <code>high_watermark</code> to the value indicated by the
+broker’s CONNACK (or 0 if not provided)</li>
+<li>Notify the application layer that sequence continuity cannot be
+guaranteed for the window between the last-acknowledged sequence and the
+new queue head</li>
+<li>Persist the new epoch value</li>
+<li>Return to HANDSHAKING state</li>
+</ol>
+<h3 id="high-watermark-protocol">3.4 High-Watermark Protocol</h3>
+<ul>
+<li>The client MUST persist <code>high_watermark</code> (last
+successfully processed and acknowledged sequence number) to durable
+local storage after each successful ACKNOWLEDGING state transition</li>
+<li>On reconnect, the client MUST present the persisted
+<code>high_watermark</code> as <code>last-seq</code> in the CONNECT User
+Property</li>
+<li>The high-watermark MUST NOT advance until the application layer
+confirms processing is complete and PUBACK has been sent</li>
+<li>For ordered <code>$queue/</code> delivery, a single integer
+watermark is sufficient (O(1) storage). Set-based idempotency tables are
+not required</li>
+</ul>
+<h3 id="exactly-once-delivery-contract">3.5 Exactly-Once Delivery
+Contract</h3>
+<p>The full client-side exactly-once workflow:</p>
+<ol type="1">
+<li>Receive PUBLISH with Property 0x30 = <code>seq</code></li>
+<li>If <code>seq &lt;= high_watermark</code>: discard (duplicate), do
+not deliver to application</li>
+<li>If <code>seq &gt; high_watermark + 1</code>: gap detected; enter
+gap-handling procedure (Section 3.2)</li>
+<li>If <code>seq == high_watermark + 1</code>: deliver to
+application</li>
+<li>Application confirms processing complete</li>
+<li>Send PUBACK to broker</li>
+<li>Persist <code>high_watermark = seq</code></li>
+</ol>
+<p>Steps 5–7 MUST be atomic from the application’s perspective: the
+watermark MUST NOT be advanced if PUBACK fails, and PUBACK MUST NOT be
+sent if application processing fails.</p>
+<h3 id="fetch-pacing">3.6 FETCH Pacing</h3>
+<ul>
+<li><strong>Baseline algorithm:</strong> Request
+<code>batch-size = min(processing_capacity, max_batch)</code> where
+<code>processing_capacity</code> is the number of messages the consumer
+can process before the next FETCH</li>
+<li><strong>Pipelining:</strong> A client MAY issue the next FETCH
+before the current batch is fully acknowledged, provided the pipeline
+depth does not exceed <code>Receive Maximum</code></li>
+<li><strong>Back-pressure signaling:</strong> If application processing
+time exceeds a configurable threshold, the client MUST reduce
+<code>batch-size</code> by 50% on the next FETCH. Recovery to full batch
+size MUST be gradual (linear increase per successful batch)</li>
+<li><strong>Idle behavior:</strong> If the broker returns an empty
+batch, the client SHOULD use long-polling (<code>Wait-Timeout</code>
+User Property) on the next FETCH rather than tight-loop polling</li>
+</ul>
+<h3 id="reconnect-protocol">3.7 Reconnect Protocol</h3>
+<p>On reconnect, the client MUST include in CONNECT:</p>
+<ul>
+<li><code>User Property: ("last-seq", "&lt;high_watermark&gt;")</code> —
+the last durably processed sequence number</li>
+<li><code>User Property: ("current-epoch", "&lt;stored_epoch&gt;")</code>
+— the epoch value the client last saw</li>
+</ul>
+<p>The broker uses these values to determine whether to increment the
+Epoch in CONNACK and to identify the resume point in the queue. A broker
+that receives <code>last-seq</code> beyond the current queue head MUST
+signal an error condition.</p>
+<h3 id="sequence-wraparound-rules">3.8 Sequence Wraparound Rules</h3>
+<ul>
+<li>A 32-bit sequence wraps at 2^32 - 1. The client MUST treat Seq 0
+following Seq 0xFFFFFFFF as a continuation, not a gap</li>
+<li>The broker MUST increment Property 0x35 (Epoch) coincident with
+sequence wraparound to provide an unambiguous continuity marker</li>
+<li>Clients MUST NOT assume that a lower sequence number following a
+higher one indicates a gap if the Epoch has also changed</li>
+</ul>
+<h3 id="sqmc-application-patterns">3.9 SQMC Application Patterns</h3>
+<p><strong>Competing mode
+(<code>v6-semantics: competing</code>):</strong> - Use for stateless
+consumers that can independently process any message in the queue -
+Deploy N consumer instances, each maintaining its own high-watermark -
+On consumer failure, surviving consumers continue processing; the failed
+consumer’s in-flight messages are requeued by the broker and dispatched
+to the next available consumer</p>
+<p><strong>Exclusive mode
+(<code>v6-semantics: exclusive</code>):</strong> - Use for stateful
+consumers where ordering is safety-critical (SECS/GEM command streams,
+protection relay sequences) - Deploy one active consumer and one standby
+consumer subscribed to the same queue - On active consumer failure, the
+broker promotes the standby automatically within one broker-side timeout
+interval - The standby MUST present its high-watermark in CONNECT so the
+broker can resume from the correct position</p>
+<hr />
+<h2 id="how-this-addresses-committee-criticisms-2">4. How This Addresses
+Committee Criticisms</h2>
+<h3 id="simons-muxing-criticism-2">4.1 Simon’s “Mux’ing” Criticism</h3>
+<blockquote>
+<p><em>“There appears to be a mux’ing of what is expected of the
+application and what is expected of the protocol.”</em></p>
+</blockquote>
+<p>Option C is the most complete answer to this criticism. MQTT 6.0
+contains zero application-layer concerns: no state machines, no
+gap-detection algorithms, no consumer patterns. MQTT Stream 1.0 contains
+zero broker-internal concerns: no persistence requirements, no property
+ID definitions, no packet formats. The line is absolute. A reader of the
+MQTT 6.0 spec cannot find application-layer logic in it. A reader of the
+MQTT Stream 1.0 spec cannot find wire-format definitions in it. The
+mux’ing is eliminated by structural separation, not by argument.</p>
+<h3 id="the-this-should-be-application-level-argument-1">4.2 The “This
+Should Be Application-Level” Argument</h3>
+<p>We agree. MQTT Stream 1.0 IS the application-level standard. It lives
+in a separate document, governed separately, versioned separately, with
+its own conformance test suite. The committee members who raised this
+concern were correct: gap detection, epoch handling, and consumer state
+machines belong at the application layer. Option C puts them there.</p>
+<h3 id="the-bloat-kafka-clone-criticism">4.3 The “Bloat / Kafka Clone”
+Criticism</h3>
+<p>The MQTT 6.0 spec is a small transport extension. It does not define
+application patterns. It specifies five new broker behaviors and three
+new property IDs. The spec document is short. It is not trying to be
+Kafka. MQTT Stream 1.0 provides Kafka-like application semantics as a
+separate, opt-in specification. A broker vendor who implements MQTT 6.0
+is not required to implement MQTT Stream 1.0. A client developer who
+targets MQTT Stream 1.0 gets Kafka-like semantics over MQTT without the
+Kafka footprint. These are separable decisions.</p>
+<h3 id="the-standardize-now-vs.-extension-first-argument">4.4 The
+“Standardize Now vs. Extension First” Argument</h3>
+<p>MQTT 6.0 goes to OASIS as a minimal transport extension — a narrow,
+well-scoped document that broker vendors can implement incrementally.
+MQTT Stream 1.0 can be submitted to the Eclipse Foundation (as a
+Sparkplug-family specification) or as an OASIS TC note — a separate
+track with faster iteration cycles. The application protocol can evolve
+without reopening the OASIS MQTT 6.0 standard. This decouples the
+governance cadence from the innovation cadence.</p>
+<h3 id="property-id-conflict-risk">4.5 Property ID Conflict Risk</h3>
+<p>A minimal MQTT 6.0 spec using only Property 0x30 (Stream Sequence
+Number) and Property 0x35 (Stream Epoch) — and optionally 0x41
+(Throughput Limit) — is a far smaller OASIS ask than a comprehensive
+spec. Smaller footprint means fewer property ID claims, fewer normative
+requirements, and less surface area for OASIS technical review to find
+objections. The minimal-scope approach maximizes the probability of
+OASIS approval for the transport layer while leaving the application
+layer free to evolve.</p>
+<hr />
+<h2 id="governance-split">5. Governance Split</h2>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>Specification</th>
+<th>Governing Body</th>
+<th>Version Cadence</th>
+<th>Who Contributes</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MQTT 6.0</td>
+<td>OASIS MQTT TC</td>
+<td>Stable / slow (years per revision)</td>
+<td>Broker vendors, protocol architects, OASIS members</td>
+<td>Foundational transport primitives — changes here affect the entire
+ecosystem</td>
+</tr>
+<tr>
+<td>MQTT Stream 1.0</td>
+<td>Eclipse Foundation (or OASIS TC Note)</td>
+<td>Faster iteration (months per revision)</td>
+<td>Application developers, industrial users, client library
+authors</td>
+<td>Application-layer profile — changes here affect Stream-conformant
+clients only</td>
+</tr>
+</tbody>
+</table>
+<p>The governance split mirrors the Sparkplug B precedent: MQTT 3.1.1 is
+an OASIS standard governed by the MQTT TC; Sparkplug B is an Eclipse
+specification governed by the Sparkplug Working Group. They have
+different maintainers, different release schedules, and different
+audiences. MQTT Stream 1.0 would occupy the same structural position
+relative to MQTT 6.0 that Sparkplug B occupies relative to MQTT 3.1.1 —
+except that MQTT Stream 1.0 would be an officially recognized companion
+specification rather than a third-party profile.</p>
+<hr />
+<h2 id="interoperability-contract">6. Interoperability Contract</h2>
+<p>An MQTT Stream 1.0 conformant client library + an MQTT 6.0 conformant
+broker = a fully interoperable industrial messaging system.</p>
+<p>The contract is bidirectional:</p>
+<ul>
+<li><p><strong>MQTT 6.0 without MQTT Stream 1.0:</strong> A broker that
+implements MQTT 6.0 provides the transport primitives. Any client that
+can issue a FETCH control publish and read Property 0x30 can consume
+from a <code>$queue/</code> — but the exactly-once guarantees and
+gap-recovery procedures are application-defined. This is sufficient for
+broker vendors who want to offer the primitives and let client libraries
+define their own application profiles.</p></li>
+<li><p><strong>MQTT Stream 1.0 without MQTT 6.0:</strong> Not possible.
+MQTT Stream 1.0 is normatively dependent on MQTT 6.0. A client library
+that claims MQTT Stream 1.0 conformance MUST run on an MQTT 6.0 broker;
+it MUST NOT claim conformance when connected to an MQTT 5.0
+broker.</p></li>
+<li><p><strong>Both together:</strong> Full industrial reliability
+stack. Gap detection, epoch resync, high-watermark persistence,
+exactly-once delivery, and FETCH pacing are all specified normatively. A
+semiconductor fab can run any MQTT Stream 1.0 client library against any
+MQTT 6.0 broker and get identical behavior — no vendor-specific payload
+conventions, no custom middleware, no Kafka bridge.</p></li>
+</ul>
+<p>Neither specification is complete without the other for the
+industrial use case. But each is complete for its own layer, and each
+can be implemented, tested, and certified independently.</p>
+<hr />
+<h2 id="trade-offs-2">7. Trade-offs</h2>
+<h3 id="advantages-1">Advantages</h3>
+<ul>
+<li><strong>Maximum committee acceptance for MQTT 6.0.</strong> A narrow
+transport extension spec is the easiest possible OASIS ask. Reviewers
+who object to application-layer content in a protocol spec will find
+nothing to object to.</li>
+<li><strong>MQTT Stream 1.0 evolves faster.</strong> Eclipse Foundation
+governance moves faster than OASIS. The application protocol can be
+updated as industrial requirements evolve without reopening the MQTT 6.0
+OASIS standard.</li>
+<li><strong>Clear governance split.</strong> Broker vendors own MQTT 6.0
+conformance. Client library authors own MQTT Stream 1.0 conformance.
+Responsibilities are unambiguous.</li>
+<li><strong>Clean precedent.</strong> The Sparkplug B model is
+understood by the standards community. Option C fits a known
+pattern.</li>
+</ul>
+<h3 id="disadvantages-1">Disadvantages</h3>
+<ul>
+<li><strong>Two separate standardization processes.</strong> The working
+group must maintain two documents, two conformance test suites, and two
+submission tracks. This is more work than a single integrated
+specification.</li>
+<li><strong>Interoperability requires conformance to both
+specs.</strong> Implementers who want full industrial reliability must
+implement both layers. The answer to “which spec do I implement?” is
+“both, depending on your role.” This adds explaining overhead,
+particularly for new adopters.</li>
+<li><strong>Risk of MQTT Stream 1.0 underadoption.</strong> If MQTT 6.0
+ships and MQTT Stream 1.0 fails to gain traction, the transport
+primitives (Property 0x30, Property 0x35, <code>$queue/</code>) may be
+underutilized or reimplemented inconsistently by client library authors
+— recreating the fragmentation problem at the application layer instead
+of the protocol layer.</li>
+<li><strong>Conformance surface area.</strong> A client library can
+claim “MQTT 6.0 compatible” without implementing the Stream state
+machine. This may create a false sense of industrial readiness in the
+ecosystem.</li>
+</ul>
+<hr />
+<h2 id="analogues-in-other-protocol-ecosystems">8. Analogues in Other
+Protocol Ecosystems</h2>
+<p>This separation pattern is well-established and understood by
+standards bodies. The table below shows the direct parallels.</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>Transport Spec</th>
+<th>Application Profile</th>
+<th>Relationship</th>
+<th>Parallel to Option C</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>MQTT 3.1.1</strong> (OASIS)</td>
+<td><strong>Sparkplug B</strong> (Eclipse)</td>
+<td>Sparkplug defines payload encoding, sequence numbers, and state
+management on top of MQTT pub/sub</td>
+<td>Most direct analogue: MQTT Stream 1.0 would be the official
+Sparkplug B for MQTT 6.0</td>
+</tr>
+<tr>
+<td><strong>HTTP/1.1</strong> (IETF RFC 2616)</td>
+<td><strong>REST</strong> (Fielding, 2000)</td>
+<td>REST is an architectural style for distributed hypermedia systems
+over HTTP; it is not an HTTP extension</td>
+<td>Architectural style defined separately from the transport
+protocol</td>
+</tr>
+<tr>
+<td><strong>CoAP</strong> (IETF RFC 7252)</td>
+<td><strong>LwM2M</strong> (OMA SpecWorks)</td>
+<td>LwM2M defines a device management application protocol over CoAP;
+CoAP defines the constrained transport</td>
+<td>IoT transport + IoT application management profile, separate
+governance bodies</td>
+</tr>
+<tr>
+<td><strong>AMQP 1.0</strong> (OASIS)</td>
+<td><strong>JMS 2.0</strong> (Jakarta EE)</td>
+<td>JMS defines a Java messaging API that can be backed by AMQP 1.0 as a
+wire transport; the API spec and the wire spec are independent</td>
+<td>API/application spec built on top of a wire transport standard</td>
+</tr>
+</tbody>
+</table>
+<p>The CoAP + LwM2M parallel is particularly apt: both are IoT
+protocols, CoAP is IETF-governed and LwM2M is OMA-governed, and the
+separation is clean enough that LwM2M implementations can run over CoAP
+or HTTP depending on the deployment. MQTT Stream 1.0 over MQTT 6.0
+follows exactly this model.</p>
+<p>The Sparkplug B parallel is the most persuasive for this committee:
+Sparkplug already defines application-layer sequencing
+(<code>bdSeq</code>, <code>seq</code> fields in protobuf payloads),
+birth/death certificate state management, and reconnect procedures on
+top of MQTT 3.1.1 — and it works. MQTT Stream 1.0 would provide those
+same guarantees at the wire level, under official MQTT ecosystem
+governance, for any MQTT 6.0 broker. Option C is not a novel idea. It is
+the formalization of a pattern the MQTT community already uses in
+production.</p>
+<hr />
+<h2 id="references-3">References</h2>
+<ul>
+<li><a
+href="https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html">MQTT
+v5.0 OASIS Standard</a></li>
+<li><a href="https://sparkplug.eclipse.org/specification/">Eclipse
+Sparkplug B Specification</a></li>
+<li><a
+href="https://www.openmobilealliance.org/solutions/lightweight-m2m">OMA
+LwM2M Specification</a></li>
+<li><a href="https://datatracker.ietf.org/doc/html/rfc7252">RFC 7252:
+CoAP</a></li>
+<li><a href="https://www.amqp.org/node/102">AMQP 1.0 OASIS
+Standard</a></li>
+<li>MQTT v6.0 Proposal Spec:
+<code>docs/spec/mqtt-v6.0-spec.md</code></li>
+<li>Committee Rebuttals: <code>docs/rebuttals.md</code></li>
+<li>Critiques and Rebuttals:
+<code>docs/critiques-and-rebuttals.md</code></li>
+<li>Alternative Approaches: <code>docs/alternatives.md</code></li>
+</ul>
 </body>
 </html>
