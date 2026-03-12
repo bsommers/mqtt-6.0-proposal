@@ -6,7 +6,15 @@
 
 > **The core problem:** MQTT currently guarantees delivery — but it cannot guarantee state reconstruction. After a device reconnect, broker restart, or cluster failover, neither the client nor the broker has a standard mechanism to answer: "Did we miss any messages? Did a command execute twice? Can we reconstruct the system's current state?" MQTT v6.0 adds the minimal metadata needed to answer these questions deterministically.
 
-A companion compatibility profile — **MQTT Reliable Secure Streams Profile (MQTT-RSSP)** — provides the same semantics over existing MQTT 5.0 brokers without requiring protocol-level changes, enabling incremental adoption.
+### Two Tracks, One Semantic Framework
+
+This proposal exists in two interoperable forms, and the distinction matters for how it reaches standardization:
+
+**Track B — MQTT-RSSP (Phase 1, submit first):** All semantics expressed as MQTT v5.0 User Properties and `$SYS/` control topics. Works on any existing v5.0 broker with zero wire-protocol changes. This is what gets submitted to OASIS first — as an interoperability profile that any conformant MQTT v5.0 broker can forward today without modification.
+
+**Track A — Native v6.0 (Phase 2, deferred optimization):** Protocol Level 6, Type 16 `FETCH` packet, binary Property IDs (`0x30`, `0x35`, `0x3A`–`0x3C`). Better performance and protocol-level enforcement. Submitted to OASIS after MQTT-RSSP is ratified — as an efficiency optimization for a semantic framework the ecosystem has already standardized and validated.
+
+The recommended path is Track B first. Submitting as a compatible profile rather than a protocol revision is not a retreat from the technical goals — the semantics are identical. Track A becomes the natural next step once Track B is in production. See [TC Positioning Strategy](tc-positioning-strategy.md) for the full submission sequencing rationale.
 
 It is **not** a general-purpose upgrade. It is **not** "MQTT trying to become Kafka." It targets a specific tier of deployment: **semiconductor manufacturing ([SECS/GEM](https://en.wikipedia.org/wiki/SECS/GEM)), energy grid SCADA ([IEC 61850](https://en.wikipedia.org/wiki/IEC_61850)), and large-scale industrial IoT** — environments where MQTT v5.0 is already deployed at the edge but operators are forced to bolt on Kafka or AMQP at the broker tier to get durable queuing, ordered delivery, and consumer group semantics. v6.0 eliminates that bridge.
 
@@ -20,10 +28,10 @@ For a detailed response to criticisms including "v5.0 already does this" and "th
 
 MQTT v5.0 is excellent for lightweight telemetry and command delivery. However, it has structural limitations that force enterprise users to embed reliability logic inside application payloads — a pattern already codified by [Eclipse Sparkplug B](https://sparkplug.eclipse.org/specification/) with its application-layer sequence numbers, and replicated ad-hoc by every industrial MQTT deployment that needs message ordering guarantees:
 
-- **No global message ordering.** The 16-bit Packet Identifier is per-session, transient, and recycled — making it impossible for a consumer to detect gaps caused by broker restarts or cluster failovers.
-- **Push-only delivery.** The broker pushes all messages to consumers as fast as they arrive. A slow consumer cannot apply backpressure without complex out-of-band coordination.
+- **No global message ordering.** The 16-bit Packet Identifier is per-session, transient, and recycled — making it impossible for a consumer to detect gaps caused by broker restarts or cluster failovers. In a system with 50 publishers and 20 downstream consumers, working around this requires 1,000 pairwise schema agreements — one for each publisher-consumer pair that must independently embed, encode, and parse sequence numbers in application payloads, each in a vendor-specific format.
+- **Push-only delivery.** The broker pushes all messages to consumers as fast as they arrive. A slow consumer cannot apply backpressure without complex out-of-band coordination. Under sustained load, a recovering consumer is flooded with backlogs it cannot drain — it falls permanently behind, then crashes, then reconnects to a larger backlog.
 - **Session-bound queues.** Messages are only held for a client while its session exists. There is no way to create a durable queue that outlives client connections.
-- **Loose shared subscription semantics.** MQTT's `$share/` mechanism provides load balancing but lacks strict exclusive-consumer and message-locking semantics needed for transactional processing.
+- **Loose shared subscription semantics.** MQTT's `$share/` mechanism provides load balancing but lacks strict exclusive-consumer and message-locking semantics needed for transactional processing. Worse: normative requirement `[MQTT-4.8.2-5]` explicitly prohibits re-delivering a message to another consumer if the original consumer's session terminates before acknowledging — an unacknowledged message in a competing-consumer group is *destroyed*, not re-queued.
 - **No cluster-aware consistency.** When a broker node fails and a client reconnects to a new node, the protocol has no mechanism to detect what was lost or resume from an exact point.
 
 These gaps are currently "solved" by embedding sequence numbers, idempotency keys, and acknowledgment logic in message payloads — a non-standard, non-interoperable approach.
@@ -37,19 +45,27 @@ MQTT v6.0 introduces six targeted additions to the protocol. In compatibility mo
 ### 1. 32-bit Stream Sequence Numbers
 A new Property (`0x30`) carrying a monotonic, cluster-wide 32-bit integer is attached to every message in the `$queue/` namespace. This allows consumers to detect gaps (`received Seq 1002 but expected 1001`), perform deduplication, and implement application-level exactly-once processing without embedding logic in payloads.
 
+The broker assigns the sequence number — publishers do not need to be aware of it. Every consumer reads it from the same protocol property, regardless of payload format. The 1,000 pairwise schema agreements required by application-layer sequencing collapse to zero: **when reliability metadata is in the protocol, the protocol is the agreement.**
+
 ### 2. Stream Epoch
-A new Property (`0x35`) that tracks the "era" of a queue. When a broker cluster suffers a catastrophic failure and cannot guarantee sequence continuity, the Epoch is incremented. Consumers that detect an Epoch change know they must discard local idempotency state and re-synchronize — analogous to a SECS/GEM Establish Communications (S1F13) reset.
+A new Property (`0x35`) that tracks the "era" of a queue. When a broker suffers a failure that breaks sequence continuity — a single-node restart, a cluster partition, any event where the broker cannot guarantee it assigned every sequence number exactly once — the Epoch is incremented. Consumers that detect an Epoch change know they must discard local idempotency state and re-synchronize.
+
+The Epoch is a **protocol-visible continuity signal**, not a cluster implementation detail. A single-node Mosquitto instance that restarts and cannot guarantee sequence continuity increments its Epoch. No clustering, no Raft/Paxos required. The signal is topology-agnostic — analogous to a SECS/GEM Establish Communications (S1F13) reset.
 
 ### 3. Named Durable Queues (`$queue/` namespace)
 Topics prefixed with `$queue/` are treated as first-class queue entities: persisted to non-volatile storage, sequenced, and retained indefinitely until consumed or expired — independent of any client session. This replaces the implicit, session-bound queue model of v5.0.
 
 ### 4. Pull-Based Flow Control (FETCH)
-A new `FETCH` Control Packet (Type 16) lets consumers explicitly request batches of messages from the broker. The broker holds messages in the persistent queue and releases them only when asked. This eliminates the "thundering herd" problem where a recovering consumer is flooded with backlogged messages. For v5.0-compat environments, a Virtual FETCH mechanism uses a `$SYS/` control topic instead.
+A new `FETCH` Control Packet (Type 16) lets consumers explicitly request batches of messages from the broker. The broker holds messages in the persistent queue and releases them only when asked. No `FETCH` request = no delivery.
+
+This eliminates the slow consumer death spiral: a consumer doing a database write per message fills its QoS in-flight window, processes it, and immediately receives the next window. It can never pause. Under sustained load, write latency climbs, the window drains slower, and eventually the consumer crashes — then reconnects to an even larger backlog. Under FETCH, it requests when ready. The broker is the buffer. For v5.0-compat environments, a Virtual FETCH mechanism uses a `$SYS/` control topic with identical semantics.
 
 ### 5. Single-Queue Multi-Consumer (SQMC) Semantics
 An extension to `SUBSCRIBE` that adds two new consumer modes beyond the loose `$share/` model:
-- **Competing:** Messages are distributed to exactly one consumer via round-robin, with strict message locking and immediate failover if the consumer disconnects before acknowledging.
+- **Competing:** Messages are distributed to exactly one consumer via round-robin, with strict message locking. If a consumer disconnects before acknowledging, the message lock releases immediately and the broker re-dispatches to the next available consumer — regardless of session state.
 - **Exclusive:** One designated consumer receives all messages; others are hot standbys that take over instantly on failure, preserving strict ordering.
+
+**Why Exclusive mode is non-negotiable for safety-critical streams:** A semiconductor fab's `S2F21` (Remote Process Start) command must execute exactly once on a single designated consumer. Under `$share/`, if that consumer crashes before sending PUBACK, `[MQTT-4.8.2-5]` forbids re-delivery to any other consumer — the command is destroyed, and a wafer is lost. Under SQMC Exclusive mode, the message lock is held by the broker, not the client session. The hot-standby consumer takes over within one round-trip. The command executes exactly once, with no data loss and no duplicate execution.
 
 ### 6. Mandatory TLS 1.3 + Optional Payload Encryption (Zero Trust)
 Native Mode v6.0 connections MUST use TLS 1.3, eliminating the vulnerable cipher suites and additional round-trip latency of TLS 1.2. For deployments where the broker must be treated as an untrusted intermediary (zero trust architectures), v6.0 introduces three optional key metadata properties (`0x3A` Key ID, `0x3B` Algorithm, `0x3C` Key Version) that allow end-to-end encrypted payloads to carry the information consumers need to decrypt them — without placing any key material in the protocol. Key management (distribution, rotation, revocation) is explicitly an application-layer responsibility. This feature is entirely opt-in; deployments using TLS 1.3 transport encryption alone are fully conformant.
@@ -104,7 +120,13 @@ Security considerations for the new primitives — including ACL requirements fo
 
 This proposal is intentionally scoped to a single problem domain: adding durable, ordered queuing primitives for industrial broker-tier use cases. It does not attempt to replace general-purpose message queues, add stream processing, or modify MQTT's core pub/sub semantics. The features are additive and opt-in.
 
-The recommended standardization path is **layered**: submit the core primitives (Stream Sequence, Epoch, `$queue/` namespace) as a first submission, with FETCH and SQMC as follow-on extensions if the core is accepted. This allows the committee to evaluate the proposal incrementally.
+**The two-phase standardization path:**
+
+- **Phase 1 — MQTT-RSSP (Track B):** Submit the compatible extension layer to OASIS as an interoperability profile. Scope: Stream Sequence (`v6-seq` User Property), Epoch (`v6-epoch`), `$queue/` persistence semantics, Virtual FETCH, SQMC consumer modes. No breaking changes. No new packet types. Any conformant MQTT v5.0 broker forwards MQTT-RSSP messages unchanged. This phase establishes the semantic framework.
+
+- **Phase 2 — Native v6.0 extensions (Track A):** Once MQTT-RSSP is ratified and validated in the field, propose the wire-efficiency optimizations: Type 16 `FETCH` packet, Property IDs `0x30`/`0x35`/`0x3A`–`0x3C`, Protocol Level 6. At this point the TC is not evaluating new semantics — those are already standardized. They are approving an optimized encoding for them.
+
+This sequencing is not a compromise — it is the strategy most likely to succeed. Submitting as a compatible profile ("MQTT-RSSP") rather than as "MQTT 6.0 protocol revision" removes the two largest sources of TC resistance before the technical review begins: backwards compatibility concerns and ecosystem disruption risk. See [TC Positioning Strategy](tc-positioning-strategy.md) for the full argument and estimated acceptance probabilities.
 
 ## Recommendation
 

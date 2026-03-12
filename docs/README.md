@@ -9,7 +9,8 @@
 ## Audience Reading Paths
 
 **Standards Committee Member**
-> Start here: [TC Positioning Strategy](tc-positioning-strategy.md) → [Executive Summary](executive-summary.md) → [Motivation](motivation.md) → [Application Layer Lift — Option C](lift-option-c.md) → [Alternative Approaches](alternatives.md) → [Addressing Criticisms](rebuttals.md)
+> Start here: [Executive Summary](executive-summary.md) → [TC Positioning Strategy](tc-positioning-strategy.md) → [Alternative Approaches](alternatives.md) → [Addressing Criticisms](rebuttals.md)
+> *(~25 minutes. Executive Summary now contains the core technical case, two-track framing, and standardization path. TC Positioning Strategy has the OASIS submission sequencing and objection responses. Deep-dive: [Motivation](motivation.md) for full technical justification of each feature.)*
 
 **HiveMQ Engineer / Implementer**
 > Start here: [Executive Summary](executive-summary.md) → [Motivation](motivation.md) → [Full Specification](spec/mqtt-v6.0-spec.md) → [Critical Perspectives & Pitfalls](critiques-and-rebuttals.md) → [Reference Implementations](#reference-implementations)
@@ -77,15 +78,15 @@ MQTT v6.0 solves three hard problems of industrial IoT that MQTT v5.0 leaves to 
 
 ## Two Tracks
 
-The proposal exists in **two variants** — see [Alternatives](alternatives.md) for full discussion:
+The proposal exists in **two variants** with one recommended submission sequence:
 
-### Track A: Native v6.0 (Breaking)
-Introduces `FETCH` as a true Control Packet Type 16. Requires v6.0-aware broker and clients. Protocol Level in CONNECT is `6`.
+### Track B: MQTT-RSSP — Compatible Extension (Submit First)
+All semantics expressed as MQTT v5.0 User Properties and `$SYS/` control topics. Works on existing v5.0 brokers with zero wire-protocol changes. This is the **MQTT Reliable Secure Streams Profile (MQTT-RSSP)** — the Phase 1 OASIS submission. Protocol Level remains `5`.
 
-### Track B: Compatible Extension / MQTT-RSSP (Non-Breaking)
-Tunnels all v6.0 features through v5.0 Property and User Property fields. Works on existing v5.0 brokers with a HiveMQ Extension Plugin. This track is also the basis for the **MQTT Reliable Secure Streams Profile (MQTT-RSSP)** OASIS submission — a broker-transparent interoperability standard. Protocol Level remains `5`.
+### Track A: Native v6.0 (Deferred Optimization)
+Introduces `FETCH` as Control Packet Type 16, binary Property IDs (`0x30`, `0x35`, `0x3A`–`0x3C`), and Protocol Level `6`. Requires v6.0-aware broker and clients. The Phase 2 OASIS submission — once MQTT-RSSP is ratified, Track A native extensions are the efficiency optimization for the already-standardized semantics.
 
-The **recommended path** is to submit Track B (MQTT-RSSP) to OASIS first, then propose Track A native extensions as an efficiency optimization once the semantic framework is standardized.
+The **recommended path** is Track B first. See [TC Positioning Strategy](tc-positioning-strategy.md) for the full submission sequencing rationale and acceptance probability analysis.
 
 ---
 

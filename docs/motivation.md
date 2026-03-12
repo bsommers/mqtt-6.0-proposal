@@ -56,6 +56,8 @@ These deployments can connect to a v6.0 broker without modification — the brok
 
 ## 2. The Problem Statement: What MQTT v5.0 Cannot Do
 
+> **Reading note:** The [Executive Summary](executive-summary.md) introduces all five limitations with concrete examples of their operational impact. This section provides the full technical justification for each — including the Packet Identifier vs. Stream Sequence analysis, the push vs. pull flow control semantics, and the normative `[MQTT-4.8.2-5]` analysis of shared subscriptions. If you have read the Executive Summary, use this as a reference, not a re-read.
+
 MQTT v5.0 is a well-designed protocol for lightweight publish-subscribe messaging. It was not designed to be a message queue. Five specific limitations emerge at scale in industrial deployments:
 
 ### 2.1 No Durable, Session-Independent Queues

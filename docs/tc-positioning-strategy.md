@@ -2,8 +2,8 @@
 
 > **Author:** Bill Sommers, AI Solutions Lead, HiveMQ, Inc.
 > **Date:** March 2026
-> **Status:** Internal strategy document — not for external distribution
-> **Context:** Synthesizes an external ChatGPT technical review into a concrete committee positioning strategy
+> **Status:** Strategy document — March 2026
+> **Context:** Concrete positioning strategy for OASIS TC submission, synthesizing external technical review feedback
 
 ---
 
