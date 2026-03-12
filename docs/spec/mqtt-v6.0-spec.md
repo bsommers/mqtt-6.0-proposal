@@ -504,6 +504,76 @@ All MQTT v5.0 security requirements (TLS, Enhanced Authentication, SASL/SCRAM) a
 - **Normative:** A Client's High-Watermark (last processed sequence number) determines the resumption point on reconnect. If a Client's High-Watermark is tampered with (set to a value higher than actually processed), messages between the true and false watermark are silently skipped. Client implementations MUST persist the High-Watermark atomically with the business-logic processing of each message (Section 4.3.4).
 - **Informative:** The Broker does not validate that a Client's reported `v6-last-seq` is truthful. A malicious client could report a false High-Watermark to skip messages. Deployments requiring tamper-proof watermark tracking SHOULD implement server-side watermark validation.
 
+### 7.5 Transport Security — TLS 1.3 Requirement
+
+**[NEW for v6.0]**
+
+- **Normative:** A v6.0 Broker operating in Native Mode (Protocol Level 6) MUST support TLS 1.3 as defined in RFC 8446. A v6.0 Client in Native Mode MUST NOT negotiate TLS versions prior to TLS 1.3 with a v6.0 Broker.
+- **Normative:** A v6.0 Broker MUST reject connections from clients that offer only TLS 1.2 or earlier cipher suites when operating in Native Mode. Reason Code `0x87 (Not Authorized)` is returned.
+- **Normative:** The following TLS 1.3 cipher suites MUST be supported: `TLS_AES_256_GCM_SHA384`, `TLS_CHACHA20_POLY1305_SHA256`. Brokers MAY support additional cipher suites.
+- **Informative:** TLS 1.3 eliminates the handshake round-trip latency of TLS 1.2 and removes vulnerable cipher suites (RC4, 3DES, CBC-mode AES without HMAC). For industrial deployments where both latency and auditability matter, TLS 1.3 is the appropriate floor.
+- **Compatibility Note:** In Compatibility Mode (Protocol Level 5), TLS 1.3 is RECOMMENDED but NOT required. Existing v5.0 deployments may use TLS 1.2 during migration. Operators SHOULD establish a migration timeline when upgrading to Native Mode.
+
+### 7.6 Optional Payload Encryption (Zero Trust)
+
+**[NEW for v6.0 — OPTIONAL FEATURE]**
+
+> **Note:** This feature is entirely optional. It is never required for protocol conformance. Deployments that rely on TLS 1.3 transport encryption alone (Section 7.5) are fully conformant. Payload encryption is provided for zero trust architectures where the broker must be treated as an untrusted intermediary.
+
+#### 7.6.1 Motivation
+
+In zero trust architectures, end-to-end confidentiality requires that the broker — even a trusted HiveMQ cluster — cannot read message payloads. TLS 1.3 secures the transport hop (client→broker, broker→subscriber) but terminates at the broker. Payload encryption extends confidentiality across the broker, making the broker a sealed transport for ciphertext it cannot inspect.
+
+This matters specifically for `$queue/` topics carrying sensitive industrial payloads (SECS/GEM process recipes, financial transactions, regulated health or grid data) where the broker operator and the data owner are organizationally distinct.
+
+#### 7.6.2 New Properties for Key Metadata
+
+Three new optional properties carry encryption metadata on PUBLISH packets. These properties describe the encryption applied to the payload. They carry no key material — key distribution is an application-layer responsibility outside this specification.
+
+| Property ID | Name | Type | Description |
+|------------|------|------|-------------|
+| `0x3A` | **Payload Key ID** | UTF-8 String | Opaque identifier for the symmetric key used to encrypt the payload. Consumers use this to look up the correct decryption key from their key management system. |
+| `0x3B` | **Payload Algorithm** | Byte | Enum identifying the encryption algorithm. See Section 7.6.3. |
+| `0x3C` | **Payload Key Version** | Two Byte Integer | Key rotation counter. Consumers can detect key rotation events without changing the Key ID. |
+
+These properties MUST NOT appear on PUBLISH packets whose payloads are not encrypted. A broker that receives these properties MUST forward them to subscribers unchanged; it MUST NOT attempt to decrypt or re-encrypt payloads.
+
+#### 7.6.3 Payload Algorithm Enum (Property `0x3B`)
+
+| Value | Algorithm | Notes |
+|-------|-----------|-------|
+| `0x01` | AES-256-GCM | Recommended default; AEAD; authenticated encryption |
+| `0x02` | ChaCha20-Poly1305 | Preferred for constrained clients without AES hardware acceleration |
+| `0x03` | AES-128-GCM | Acceptable where bandwidth or compute is constrained |
+| `0x7F` | Implementation-Defined | For private extensions; not interoperable across broker vendors |
+
+#### 7.6.4 Nonce and Authentication Tag
+
+When using an AEAD cipher (all standardized algorithms above), the encrypted payload format is:
+
+```
+[12-byte nonce][ciphertext][16-byte authentication tag]
+```
+
+The nonce MUST be unique per message. Implementations SHOULD derive the nonce by combining a random base with the Stream Sequence Number (`0x30`) to prevent nonce reuse across queue messages while remaining deterministic for deduplication.
+
+#### 7.6.5 Key Management — Application Layer Boundary
+
+Key distribution, key rotation procedures, key revocation, and certificate management are **application-layer responsibilities**. This specification defines only the metadata properties that identify which key and algorithm were used. How keys are exchanged, stored, and rotated is intentionally outside this specification.
+
+> Refer to the MQTT Stream Application Profile (Option A in the Application Layer Lift documentation) for recommended key management patterns, including integration with SPIFFE/SPIRE for workload identity and HPKE for asymmetric key encapsulation.
+
+#### 7.6.6 Broker Behavior for Encrypted Payloads
+
+- **Normative:** A Broker MUST NOT reject a PUBLISH solely because it carries payload encryption properties (`0x3A`, `0x3B`, `0x3C`).
+- **Normative:** A Broker MUST forward payload encryption properties to all matching subscribers unchanged.
+- **Normative:** A Broker MUST NOT log, inspect, or cache the decrypted payload content. The broker is a sealed conduit for encrypted payloads.
+- **Informative:** Because the broker cannot inspect encrypted payloads, content-based routing (topic-based filtering on payload content), stream processing plugins, and payload-aware QoS features are unavailable for encrypted `$queue/` messages. Topic design must carry all routing information in the topic string rather than in the payload.
+
+#### 7.6.7 Interaction with Stream Sequence Numbers
+
+Stream Sequence Numbers (`0x30`) are assigned to the encrypted payload as a whole. The sequence number does not depend on plaintext content. Gap detection, high-watermark tracking, and epoch resync operate identically whether the payload is encrypted or not — all sequence semantics are in the MQTT properties layer, not the payload.
+
 ---
 
 ## Annex A: SECS/GEM Mapping

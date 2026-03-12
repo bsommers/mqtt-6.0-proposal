@@ -42,7 +42,10 @@ Topics prefixed with `$queue/` are treated as first-class queue entities: persis
 ### 4. Pull-Based Flow Control (FETCH)
 A new `FETCH` Control Packet (Type 16) lets consumers explicitly request batches of messages from the broker. The broker holds messages in the persistent queue and releases them only when asked. This eliminates the "thundering herd" problem where a recovering consumer is flooded with backlogged messages. For v5.0-compat environments, a Virtual FETCH mechanism uses a `$SYS/` control topic instead.
 
-### 5. Single-Queue Multi-Consumer (SQMC) Semantics
+### 5. Mandatory TLS 1.3 + Optional Payload Encryption (Zero Trust)
+Native Mode v6.0 connections MUST use TLS 1.3, eliminating the vulnerable cipher suites and additional round-trip latency of TLS 1.2. For deployments where the broker must be treated as an untrusted intermediary (zero trust architectures), v6.0 introduces three optional key metadata properties (`0x3A` Key ID, `0x3B` Algorithm, `0x3C` Key Version) that allow end-to-end encrypted payloads to carry the information consumers need to decrypt them — without placing any key material in the protocol. Key management (distribution, rotation, revocation) is explicitly an application-layer responsibility. This feature is entirely opt-in; deployments using TLS 1.3 transport encryption alone are fully conformant.
+
+### 6. Single-Queue Multi-Consumer (SQMC) Semantics
 An extension to `SUBSCRIBE` that adds two new consumer modes beyond the loose `$share/` model:
 - **Competing:** Messages are distributed to exactly one consumer via round-robin, with strict message locking and immediate failover if the consumer disconnects before acknowledging.
 - **Exclusive:** One designated consumer receives all messages; others are hot standbys that take over instantly on failure, preserving strict ordering.
