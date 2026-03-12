@@ -31,6 +31,12 @@
 13. [Performance Analysis: High-Volume & DEP Scale](performance-analysis.md)
 14. [Critical Analyses: Security, OT SRE, and Protocol Design](critical-analyses.md)
 
+### Application Layer Lift
+15. [The Lift — Overview & Feature Split](lift-overview.md)
+16. [Option A: Slim Protocol + MQTT Stream Application Profile](lift-option-a.md)
+17. [Option B: Protocol Spec + Normative Annex A](lift-option-b.md)
+18. [Option C: Two Independent Specifications](lift-option-c.md)
+
 ### Reference Implementations
 14. [Python v6.0 Shim (`gmqtt`)](../src/python/mqtt_v6_shim.py)
 15. [Protobuf Schema](../src/proto/mqtt_v6.proto)
