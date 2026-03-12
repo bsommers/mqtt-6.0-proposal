@@ -8,6 +8,8 @@
 
 **This is not "MQTT trying to become Kafka."** This is not a general-purpose upgrade. Most MQTT deployments do not need v6.0 and should remain on v5.0.
 
+> "MQTT currently guarantees delivery — but it cannot guarantee state reconstruction. MQTT v6.0 adds the minimal metadata needed for deterministic telemetry recovery after disruption."
+
 This proposal targets a specific problem: **industrial operators who already use MQTT at the edge but are forced to bolt on Kafka, AMQP, or Redis at the broker tier** to get durable queuing and ordered delivery. The edge devices cannot change — they run constrained firmware with MQTT baked in. The bridge architecture (MQTT → Kafka → Consumer) adds operational cost, a second failure domain, and a second protocol stack. v6.0 eliminates the bridge by extending the MQTT broker with the specific queuing primitives these operators need, without changing the edge protocol.
 
 Every feature in v6.0 is already being implemented at the application layer by industrial MQTT users — sequence numbers in payloads, idempotency tables in databases, consumer group coordination in custom code. [Eclipse Sparkplug B](https://sparkplug.eclipse.org/specification/) is the most prominent example: it defines [application-layer sequencing on top of MQTT](https://sparkplug.eclipse.org/specification/version/2.2/documents/sparkplug-specification-2.2.pdf) precisely because MQTT v5.0 does not provide these primitives natively. v6.0 proposes to move these proven patterns from the payload into the protocol where brokers can optimize for them and client libraries can handle them automatically.
@@ -53,6 +55,8 @@ These deployments can connect to a v6.0 broker without modification — the brok
 ---
 
 ## 2. The Problem Statement: What MQTT v5.0 Cannot Do
+
+> **Reading note:** The [Executive Summary](executive-summary.md) introduces all five limitations with concrete examples of their operational impact. This section provides the full technical justification for each — including the Packet Identifier vs. Stream Sequence analysis, the push vs. pull flow control semantics, and the normative `[MQTT-4.8.2-5]` analysis of shared subscriptions. If you have read the Executive Summary, use this as a reference, not a re-read.
 
 MQTT v5.0 is a well-designed protocol for lightweight publish-subscribe messaging. It was not designed to be a message queue. Five specific limitations emerge at scale in industrial deployments:
 
@@ -156,6 +160,29 @@ MQTT v5.0 introduced Shared Subscriptions (`$share/`) for competing consumers. H
 - If a consumer in the group disconnects mid-processing, the in-flight message may be re-delivered to any other consumer — but only if the broker's session timeout has not expired
 
 **The result:** Building a reliable competing consumer pipeline on `$share/` requires extensive application-layer coordination that must be re-implemented for each new deployment.
+
+### Why HiveMQ's Declared Shared Subscriptions Don't Solve This
+
+HiveMQ [Declared Shared Subscriptions](https://docs.hivemq.com/hivemq/latest/user-guide/declared-shared-subscriptions.html) improve on standard `$share/` by buffering messages even when no subscriber is connected — a real and useful improvement over the base spec. But they leave four critical gaps open.
+
+| Capability | `$share/` (MQTT v5.0 Spec) | HiveMQ Declared Shared Subscriptions | SQMC (`$queue/` + v6.0) |
+|---|---|---|---|
+| **Buffer messages when no subscriber connected** | Not guaranteed — spec is silent | Yes — HiveMQ's primary addition | Yes — `$queue/` persists independently |
+| **Re-dispatch unacked message on consumer disconnect** | No — `[MQTT-4.8.2-5]` prohibits; message discarded if session terminates | No — `[MQTT-4.8.2-5]` still applies at spec level | Yes — lock released immediately; re-dispatched to next available consumer |
+| **Exclusive consumer / hot-standby mode** | No | No | Yes — primary consumer + automatic standby promotion on disconnect |
+| **Message ordering guarantee** | No — `[MQTT-4.6.0-6]` scopes ordering to non-shared subscriptions only | No | Yes — strict ascending Stream Sequence Number per queue |
+| **Gap detection** | Impossible — no per-message identity | Impossible | Built-in — sequence gaps are detectable and auditable |
+| **Survives broker restart (spec-mandated)** | No — persistence is implementation-defined | Yes (HiveMQ-specific behavior) | Yes — persistence to non-volatile storage required before PUBACK |
+| **Interoperable across broker vendors** | Yes — standard | No — HiveMQ-proprietary | Yes — standardized wire format |
+| **Named, inspectable entity** | No — subscription pattern only | No — broker config entry only | Yes — `$queue/` is a first-class entity with TTL, max-size, storage policy |
+
+**The critical gap: `[MQTT-4.8.2-5]`.** [MQTT v5.0 Section 4.8.2, normative requirement `[MQTT-4.8.2-5]`](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901250) states: *"If the Client's Session terminates before the Client reconnects, the Server MUST NOT send the Application Message to any other subscribed Client."* This means: if a consumer in any `$share/` group — including a Declared Shared Subscription — receives a QoS 1 message, disconnects before sending PUBACK, and its session expires, the message is **discarded**. The spec explicitly prohibits the broker from re-delivering it to another consumer. In traditional competing-consumer queues (AMQP, JMS, Kafka consumer groups), an unacknowledged message is returned to the queue and re-dispatched. In MQTT v5.0 shared subscriptions — proprietary or otherwise — it is destroyed. SQMC breaks from this by treating `$queue/` topics as session-independent persistent stores: when a competing consumer disconnects, the message lock is released and the message is immediately re-dispatched regardless of session state.
+
+**The exclusive consumer gap.** Declared Shared Subscriptions provide no equivalent to SQMC Exclusive Consumer mode. There is no mechanism in any `$share/` variant — declared or dynamic — to designate one consumer as primary and hold others as hot standbys that take over instantly on primary disconnect while preserving strict ordering. This pattern is non-negotiable for safety-critical command streams: SECS/GEM S2F21 (Remote Start), grid protection relay commands, and financial settlement messages where exactly one consumer must process each message in strict order with zero-delay failover.
+
+**Why this is the argument, not the counterargument.** The existence of Declared Shared Subscriptions as a HiveMQ-proprietary feature is itself evidence that the MQTT standard has a gap — HiveMQ built it because `$share/` alone did not satisfy customer requirements. And yet those same customers are asking for re-dispatch-on-failure and exclusive consumer semantics that Declared Shared Subscriptions still cannot provide. The extension-first path is also how `$SYS/` became permanently fragmented: EMQX, Mosquitto, and HiveMQ each implemented it differently, and 15 years later there is still no standard. Standardizing SQMC semantics now — before EMQX, AWS IoT Core, and others build incompatible variants — avoids repeating that outcome.
+
+*For a full side-by-side treatment of this comparison, including the normative `[MQTT-4.8.2-5]` analysis, see the standalone reference document [`sqmc-vs-declared-shared-subscriptions.md`](sqmc-vs-declared-shared-subscriptions.md).*
 
 ---
 
@@ -282,6 +309,49 @@ This layering allows the standards committee to evaluate and accept the core pri
 | Clear upgrade path from v5.0 | Compatibility layer; no flag-day migration |
 | Standardised semantics reduce broker lock-in | Wire protocol defines queue behaviour, not just transport |
 | Opens MQTT to new use cases | Financial telemetry, ERP integration, command-and-control audit trails |
+
+---
+
+## 5.5 MQTT v6.0 as Telemetry Integrity Infrastructure
+
+The proposal's features map to a specific layer in the emerging industrial AI stack. Modern industrial systems are converging on a four-layer architecture:
+
+```
+┌─────────────────────────────────────┐
+│ Layer 4 – Industrial AI Agents      │
+│ autonomous decision systems         │
+└─────────────────────────────────────┘
+                ▲
+┌─────────────────────────────────────┐
+│ Layer 3 – Deterministic State       │
+│ digital twin + event sourcing       │
+└─────────────────────────────────────┘
+                ▲
+┌─────────────────────────────────────┐
+│ Layer 2 – Telemetry Integrity       │
+│ sequence numbers + epochs           │
+│ ← MQTT v6.0 fills this layer        │
+└─────────────────────────────────────┘
+                ▲
+┌─────────────────────────────────────┐
+│ Layer 1 – Device Messaging          │
+│ MQTT pub/sub (unchanged)            │
+└─────────────────────────────────────┘
+```
+
+MQTT v5.0 provides Layer 1. Layers 3 and 4 are well-served by existing platforms (digital twin engines, AI inference frameworks). **Layer 2 does not exist as a standard today.** Every industrial MQTT deployment that needs telemetry continuity — gap detection, restart detection, state reconstruction after disruption — builds Layer 2 from scratch, incompatibly.
+
+MQTT v6.0 fills Layer 2. The features are precisely scoped to this layer:
+
+| Feature | Layer 2 Function |
+|---|---|
+| Stream Sequence Numbers | Detect missing telemetry events |
+| Stream Epoch | Detect publisher/broker restart boundaries |
+| `$queue/` Namespace | Provide the durable stream that Layer 2 operates on |
+| FETCH / Pull Control | Protect Layer 3 consumers from being overwhelmed during state reconstruction |
+| SQMC | Ensure Layer 3 state machines receive each event exactly once, in order |
+
+Once Layer 2 exists, Layer 3 and Layer 4 can be built reliably. Without it, digital twins drift, AI agents receive incomplete event histories, and industrial systems require manual reconciliation after every disruption.
 
 ---
 

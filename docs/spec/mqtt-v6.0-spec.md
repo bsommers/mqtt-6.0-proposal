@@ -40,6 +40,8 @@ The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**, **
 | **SQMC** | Single-Queue Multi-Consumer — a queuing pattern where each message is delivered to exactly one of multiple active consumers |
 | **Virtual FETCH** | Compatibility-mode representation of FETCH using PUBLISH to `$SYS/queues/{name}/fetch` |
 | **High-Watermark** | The last sequence number successfully processed by a consumer client |
+| **Stream Scope** | The domain within which a Stream Sequence Number is monotonically increasing. In MQTT v6.0, the stream scope is the `$queue/` topic — each named queue maintains its own independent sequence counter. This is equivalent to the "stream-id" concept in telemetry sequencing literature: a subscriber observing a `$queue/` topic sees a continuous sequence and can detect gaps without false positives from messages delivered to other queues. |
+| **Telemetry Continuity** | The property of a message stream that allows a consumer to verify that no messages were missed, duplicated, or reordered. MQTT v5.0 QoS provides delivery guarantees within a session but does not provide telemetry continuity across reconnections, broker restarts, or cluster failover. Stream Sequence Numbers, Stream Epoch, and High-Watermark together provide telemetry continuity for `$queue/` topics. |
 | **Distributed Sequence Counter** | A cluster-wide atomic counter, one per `$queue/`; any node may increment it atomically (e.g., via compare-and-swap) to claim the next sequence number. The storage and replication mechanism is implementation-defined. |
 | **Competing Consumer** | SQMC mode: messages distributed round-robin; each message delivered to exactly one consumer |
 | **Exclusive Consumer** | SQMC mode: one designated consumer receives all messages; others are hot standbys |
@@ -56,6 +58,20 @@ All data representation follows MQTT v5.0 conventions.
 **[NEW for v6.0]:**
 - **Four Byte Integer:** A 32-bit unsigned integer in big-endian order. Used for Stream Sequence Numbers.
 - **Two Byte Integer:** A 16-bit unsigned integer in big-endian order. Used for Stream Epochs.
+
+### 1.5 Non-Goals
+
+This specification explicitly does **not**:
+
+- **Introduce broker-managed log partitions or stream processing.** Message sequencing metadata is publisher-generated and broker-transparent. The broker forwards it unchanged.
+- **Require broker clustering or consensus protocols.** All cluster-related behaviors are implementation-defined. A single-node broker fully conforms to this specification.
+- **Mandate message ordering guarantees at the broker tier.** Ordering is detected by consumers using Stream Sequence Numbers; it is not enforced by broker routing.
+- **Require persistent storage beyond what is already defined for QoS 1/2.** The `$queue/` persistence requirement (Section 4.1) is additive but opt-in; standard pub/sub topics have no new storage requirements.
+- **Modify MQTT QoS semantics.** QoS 0, 1, and 2 behavior is unchanged from MQTT v5.0. Stream Sequence Numbers and Epochs are orthogonal to QoS.
+- **Replace transport-layer security.** TLS 1.3 (Section 7.5) provides transport confidentiality. Payload encryption (Section 7.6) is an optional additive layer, not a TLS replacement.
+- **Define key management, key distribution, or key rotation procedures.** These are application-layer responsibilities (Section 7.6.5).
+
+These boundaries are explicit to prevent scope creep during review and to assure committee members that the proposal is additive and interoperable with the existing MQTT ecosystem.
 
 ---
 
