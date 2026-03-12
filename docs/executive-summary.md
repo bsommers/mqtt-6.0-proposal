@@ -4,6 +4,8 @@
 
 **MQTT v6.0** is a proposed evolutionary extension to the MQTT v5.0 protocol that adds **targeted industrial queuing primitives** to the broker tier — without changing the edge protocol that millions of devices already run.
 
+> **The core problem:** MQTT currently guarantees delivery — but it cannot guarantee state reconstruction. After a device reconnect, broker restart, or cluster failover, neither the client nor the broker has a standard mechanism to answer: "Did we miss any messages? Did a command execute twice? Can we reconstruct the system's current state?" MQTT v6.0 adds the minimal metadata needed to answer these questions deterministically.
+
 A companion compatibility profile — **MQTT Reliable Secure Streams Profile (MQTT-RSSP)** — provides the same semantics over existing MQTT 5.0 brokers without requiring protocol-level changes, enabling incremental adoption.
 
 It is **not** a general-purpose upgrade. It is **not** "MQTT trying to become Kafka." It targets a specific tier of deployment: **semiconductor manufacturing ([SECS/GEM](https://en.wikipedia.org/wiki/SECS/GEM)), energy grid SCADA ([IEC 61850](https://en.wikipedia.org/wiki/IEC_61850)), and large-scale industrial IoT** — environments where MQTT v5.0 is already deployed at the edge but operators are forced to bolt on Kafka or AMQP at the broker tier to get durable queuing, ordered delivery, and consumer group semantics. v6.0 eliminates that bridge.
@@ -51,6 +53,21 @@ An extension to `SUBSCRIBE` that adds two new consumer modes beyond the loose `$
 
 ### 6. Mandatory TLS 1.3 + Optional Payload Encryption (Zero Trust)
 Native Mode v6.0 connections MUST use TLS 1.3, eliminating the vulnerable cipher suites and additional round-trip latency of TLS 1.2. For deployments where the broker must be treated as an untrusted intermediary (zero trust architectures), v6.0 introduces three optional key metadata properties (`0x3A` Key ID, `0x3B` Algorithm, `0x3C` Key Version) that allow end-to-end encrypted payloads to carry the information consumers need to decrypt them — without placing any key material in the protocol. Key management (distribution, rotation, revocation) is explicitly an application-layer responsibility. This feature is entirely opt-in; deployments using TLS 1.3 transport encryption alone are fully conformant.
+
+### Where MQTT v6.0 Fits in the Industrial Stack
+
+MQTT v6.0 occupies a precise layer in the modern industrial architecture:
+
+```
+Layer 4 – Industrial AI Agents       (autonomous decisions, anomaly detection)
+Layer 3 – Deterministic State        (digital twins, event sourcing, process models)
+Layer 2 – Telemetry Integrity        ← MQTT v6.0 fills this layer
+Layer 1 – Device Messaging           (MQTT pub/sub — unchanged)
+```
+
+Layer 1 is MQTT v5.0. Layer 2 is currently built ad-hoc by every deployment, differently and incompatibly. MQTT v6.0 standardizes Layer 2 so that Layers 3 and 4 — digital twins and AI agents — can be built on a reliable foundation.
+
+Without Layer 2, industrial AI agents receive incomplete event histories. Digital twins drift. Recovery after disruption requires manual reconciliation. MQTT v6.0 eliminates the need to build Layer 2 from scratch in every deployment.
 
 ---
 

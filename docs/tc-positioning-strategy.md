@@ -177,3 +177,61 @@ In Option C terms: the "MQTT Stream 1.0 application protocol" layer IS the MQTT-
 **Track A (native v6.0, Phase 2 submission)** maps to the HiveMQ product layer and to Option C Phase 2: the "MQTT 6.0 transport extension" broker obligations (native FETCH enforcement, binary Property IDs, Protocol Level 6 CONNECT/CONNACK negotiation) are what HiveMQ ships as a competitive differentiator and what Phase 2 proposes to OASIS once the semantic framework is established.
 
 The practical consequence: what gets submitted to OASIS first is the profile, not the transport. What HiveMQ ships as a product today is the native broker support for that profile. The technical content of both Track A and Track B is identical to the existing proposal — the only change is submission sequencing and primary identifier.
+
+---
+
+## 9. Five Predictable TC Objections and Counter-Arguments
+
+These objections will be raised in the first TC review session. Having crisp, pre-prepared responses prevents them from becoming blockers.
+
+> **Note:** The committee's decision hierarchy for objections is: (1) backwards compatibility, (2) complexity, (3) protocol scope, (4) interoperability, (5) implementation difficulty. Address the first two convincingly and the rest become manageable.
+
+**Objection 1: "This makes MQTT too complicated."**
+
+Counter: Position as optional metadata, not mandatory behavior. Constrained devices do not need to generate sequence numbers. Brokers do not need to interpret them. These are receiver-side semantics: MQTT transport unchanged, MQTT semantics unchanged, MQTT metadata extended. The same argument was made about MQTT 5.0 properties — the ecosystem absorbed it. Any deployment that does not use `$queue/`, Stream Sequence, or Epoch sees zero change to the protocol they operate today.
+
+**Objection 2: "This looks like Kafka, not MQTT."**
+
+Counter: Reframe as telemetry validation, not stream infrastructure. The key distinction: in Kafka, ordering is managed by broker partitions. In MQTT v6.0, ordering is *detected* using publisher metadata. The broker plays no role in sequencing — it forwards properties unchanged. "This proposal does not introduce broker-managed logs or partitions. It only enables receivers to verify telemetry completeness." The difference between gap detection and stream partitioning is architectural, not cosmetic.
+
+**Objection 3: "This assumes broker clustering."**
+
+Counter: Reframe Epoch as a publisher/broker lifecycle marker, not a distributed-systems construct. "Epoch = publisher restart marker" — not a consensus epoch. A single-node Mosquitto instance that restarts and cannot guarantee sequence continuity increments the Epoch. No clustering, no Raft/Paxos required. The Epoch is topology-agnostic. This reframe is critical — it removes the most technically intimidating aspect of the proposal before it becomes a blocker.
+
+**Objection 4: "Can't this be done at the application layer?"**
+
+Counter: It can, and it is — today, by every industrial customer, incompatibly. Vendor A uses JSON `{"seq": N}`, Vendor B uses protobuf `sequence_id`, Vendor C uses a custom binary header. No generic tooling can observe any of them. Protocol-level metadata enables: broker observability, generic client libraries, standard debugging tools, cross-vendor telemetry validation. The interoperability argument is the strongest one for standards bodies: MQTT-RSSP is a standardization of existing practice, not a proposal to change practice.
+
+**Objection 5: "Will this break existing clients?"**
+
+Counter: MQTT v5.0 requires conformant implementations to ignore unknown property IDs. Stream Sequence (0x30), Epoch (0x35), and payload encryption properties (0x3A–0x3C) are all in the currently unassigned range. Clients ignoring them remain fully compliant. The Compatibility Layer (Track B / MQTT-RSSP) implements all semantics as User Properties — zero wire-level changes. This is the same strategy MQTT 5.0 used when adding properties to 3.1.1. The backwards-compatibility story is the same answer that got v5.0 through the TC.
+
+---
+
+## 10. Vendor Alignment Strategy
+
+Three vendors whose support dramatically shifts committee dynamics toward acceptance.
+
+**HiveMQ** — Enterprise deployments and protocol thought leadership. HiveMQ customers already ask for telemetry gap detection and reconnect validation. An endorsement from HiveMQ signals enterprise production readiness. Target message: "Standardized telemetry sequencing improves operational observability in large MQTT deployments."
+
+**EMQX** — Largest broker installation base globally (telecom, automotive, industrial). Already exploring persistent stream features. A standard property allows them to build telemetry gap detection and stream observability dashboards without proprietary extensions. Target message: "Standard sequence metadata enables cross-broker interoperability for industrial telemetry."
+
+**IBM** — Protocol lineage and institutional credibility within OASIS. IBM's historical role in MQTT creation gives their voice weight in standards discussions. Target message: "Telemetry continuity metadata strengthens MQTT's data integrity guarantees without altering its lightweight nature."
+
+> **The ideal scenario** is two independent broker vendors who already implement the feature. At that point the conversation shifts from "should we do this?" to "how should we standardize this?" — a fundamentally different committee dynamic.
+
+---
+
+## 11. The Observability Commercial Hook
+
+The observability angle resonates with vendors because it enables new commercial features that differentiate their products. Protocol-level metadata opens a class of broker capabilities that User Properties alone cannot support:
+
+- Broker dashboards showing telemetry gap rates per device
+- Alerting on device restart events via Epoch changes
+- Edge buffering validation (did the gateway actually forward everything?)
+- Telemetry health scoring across device fleets
+- SLA validation for industrial data pipelines
+
+Most MQTT proposals solve broker problems. This proposal solves **system problems** — specifically, the operational failure modes that occur in edge computing, industrial automation, and AI data pipelines. Those are the environments MQTT now dominates, and the environments where operational visibility has the highest business value.
+
+This framing also separates MQTT-RSSP from the "Kafka competitor" narrative: Kafka solves throughput. MQTT-RSSP solves observability and recovery. These are different markets, different buyers, and different arguments in front of the TC.

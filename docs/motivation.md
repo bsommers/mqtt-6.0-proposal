@@ -8,6 +8,8 @@
 
 **This is not "MQTT trying to become Kafka."** This is not a general-purpose upgrade. Most MQTT deployments do not need v6.0 and should remain on v5.0.
 
+> "MQTT currently guarantees delivery — but it cannot guarantee state reconstruction. MQTT v6.0 adds the minimal metadata needed for deterministic telemetry recovery after disruption."
+
 This proposal targets a specific problem: **industrial operators who already use MQTT at the edge but are forced to bolt on Kafka, AMQP, or Redis at the broker tier** to get durable queuing and ordered delivery. The edge devices cannot change — they run constrained firmware with MQTT baked in. The bridge architecture (MQTT → Kafka → Consumer) adds operational cost, a second failure domain, and a second protocol stack. v6.0 eliminates the bridge by extending the MQTT broker with the specific queuing primitives these operators need, without changing the edge protocol.
 
 Every feature in v6.0 is already being implemented at the application layer by industrial MQTT users — sequence numbers in payloads, idempotency tables in databases, consumer group coordination in custom code. [Eclipse Sparkplug B](https://sparkplug.eclipse.org/specification/) is the most prominent example: it defines [application-layer sequencing on top of MQTT](https://sparkplug.eclipse.org/specification/version/2.2/documents/sparkplug-specification-2.2.pdf) precisely because MQTT v5.0 does not provide these primitives natively. v6.0 proposes to move these proven patterns from the payload into the protocol where brokers can optimize for them and client libraries can handle them automatically.
@@ -305,6 +307,49 @@ This layering allows the standards committee to evaluate and accept the core pri
 | Clear upgrade path from v5.0 | Compatibility layer; no flag-day migration |
 | Standardised semantics reduce broker lock-in | Wire protocol defines queue behaviour, not just transport |
 | Opens MQTT to new use cases | Financial telemetry, ERP integration, command-and-control audit trails |
+
+---
+
+## 5.5 MQTT v6.0 as Telemetry Integrity Infrastructure
+
+The proposal's features map to a specific layer in the emerging industrial AI stack. Modern industrial systems are converging on a four-layer architecture:
+
+```
+┌─────────────────────────────────────┐
+│ Layer 4 – Industrial AI Agents      │
+│ autonomous decision systems         │
+└─────────────────────────────────────┘
+                ▲
+┌─────────────────────────────────────┐
+│ Layer 3 – Deterministic State       │
+│ digital twin + event sourcing       │
+└─────────────────────────────────────┘
+                ▲
+┌─────────────────────────────────────┐
+│ Layer 2 – Telemetry Integrity       │
+│ sequence numbers + epochs           │
+│ ← MQTT v6.0 fills this layer        │
+└─────────────────────────────────────┘
+                ▲
+┌─────────────────────────────────────┐
+│ Layer 1 – Device Messaging          │
+│ MQTT pub/sub (unchanged)            │
+└─────────────────────────────────────┘
+```
+
+MQTT v5.0 provides Layer 1. Layers 3 and 4 are well-served by existing platforms (digital twin engines, AI inference frameworks). **Layer 2 does not exist as a standard today.** Every industrial MQTT deployment that needs telemetry continuity — gap detection, restart detection, state reconstruction after disruption — builds Layer 2 from scratch, incompatibly.
+
+MQTT v6.0 fills Layer 2. The features are precisely scoped to this layer:
+
+| Feature | Layer 2 Function |
+|---|---|
+| Stream Sequence Numbers | Detect missing telemetry events |
+| Stream Epoch | Detect publisher/broker restart boundaries |
+| `$queue/` Namespace | Provide the durable stream that Layer 2 operates on |
+| FETCH / Pull Control | Protect Layer 3 consumers from being overwhelmed during state reconstruction |
+| SQMC | Ensure Layer 3 state machines receive each event exactly once, in order |
+
+Once Layer 2 exists, Layer 3 and Layer 4 can be built reliably. Without it, digital twins drift, AI agents receive incomplete event histories, and industrial systems require manual reconciliation after every disruption.
 
 ---
 
