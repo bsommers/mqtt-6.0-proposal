@@ -583,6 +583,87 @@ Stream Sequence Numbers (`0x30`) are assigned to the encrypted payload as a whol
 
 **Informative:** In the event that a conformant MQTT v5.0 client inadvertently receives a PUBLISH packet carrying encryption properties (`0x3A`, `0x3B`, `0x3C`), the MQTT v5.0 specification mandates that the client silently ignore unknown property IDs. No protocol-level error or connection closure is triggered. Any failure is at the application layer (the client receives ciphertext it cannot interpret), not at the protocol layer. This provides a defense-in-depth guarantee: the handshake gate is the primary protection; the unknown-property rule is the fallback.
 
+### 7.7 Threat Model
+
+This section provides a formal threat model for MQTT v6.0. It identifies the actors, trust boundaries, threats addressed by this specification, and threats that are explicitly out of scope.
+
+#### 7.7.1 Actors
+
+| Actor | Description |
+|-------|-------------|
+| **Publisher** | A trusted endpoint that produces messages and publishes them to the broker. |
+| **Subscriber** | A trusted endpoint that consumes messages delivered by the broker. |
+| **Broker** | A semi-trusted router. The broker may be multi-tenant, cloud-hosted, or federated. It is trusted for routing, QoS, and session management, but is treated as an untrusted intermediary for payload content when payload encryption (Section 7.6) is in use. |
+| **Network Adversary** | A party that can observe or intercept traffic at the transport layer between any two actors. |
+| **Rogue Broker Administrator** | An internal threat — a party with administrative access to broker infrastructure who may attempt to read, modify, or replay message content. |
+
+#### 7.7.2 Trust Boundaries
+
+- **Publisher→Broker transport:** Secured by TLS 1.3 (Section 7.5). The network adversary cannot observe or tamper with this hop.
+- **Broker→Subscriber transport:** Secured by TLS 1.3 (Section 7.5). The network adversary cannot observe or tamper with this hop.
+- **Publisher→Subscriber end-to-end:** Secured by payload encryption (Section 7.6) when deployed. The broker receives and forwards ciphertext it cannot decrypt. This trust boundary holds even against the rogue broker administrator.
+- **Broker as routing intermediary:** The broker is trusted to route, sequence, and deliver messages correctly. It is not trusted to maintain payload confidentiality when Section 7.6 encryption is not in use.
+
+#### 7.7.3 Threats Addressed
+
+| # | Threat | Mitigation |
+|---|--------|-----------|
+| 1 | **Network eavesdropping** — a network adversary intercepts the transport stream to read message content | Mitigated by TLS 1.3 (Section 7.5), which encrypts all traffic between client and broker |
+| 2 | **Broker payload inspection** — the broker operator or a rogue administrator reads sensitive payload content | Mitigated by payload encryption (Section 7.6); the broker holds ciphertext and cannot recover plaintext without the application-layer key |
+| 3 | **Message replay** — an adversary records and retransmits a previously delivered message | Mitigated by Stream Epoch (Section 4.3) combined with nonce uniqueness (Section 7.6.4); consumers reject messages whose sequence number falls at or below the High-Watermark, and the AEAD nonce prevents ciphertext reuse |
+| 4 | **Message gap / loss detection** — messages are silently dropped between publisher and subscriber without detection | Mitigated by Stream Sequence Numbers (Section 4.3); consumers detect gaps by observing discontinuities in the monotonic sequence |
+| 5 | **Broker message tampering** — the broker or a network adversary modifies payload content in transit | Mitigated by the AEAD authentication tag (Section 7.6.4); any modification to the ciphertext or associated data causes tag verification to fail at the subscriber |
+
+#### 7.7.4 Threats Not Addressed (Out of Scope)
+
+The following threats are explicitly outside the scope of this specification:
+
+- **Key distribution and rotation:** The means by which publishers and subscribers obtain, exchange, rotate, and revoke symmetric keys is an application-layer responsibility. This specification defines only the metadata properties that identify which key was used (Section 7.6.5).
+- **Broker ACL bypass:** Authorization enforcement — ensuring that a given client is permitted to publish or subscribe to a given topic — is the responsibility of the broker's authorization layer. This specification defines that ACLs MUST be enforced (Section 4.1.4, Section 7.1) but does not define the authorization mechanism.
+- **Physical device compromise:** An adversary with physical access to a publisher or subscriber endpoint can extract keys or inject false messages at the application layer. This is outside the protocol threat model.
+- **Denial of service at the broker tier:** Volumetric attacks, resource exhaustion, and distributed denial-of-service attacks against broker infrastructure are outside the scope of this specification. The Throughput Limit property (Section 2.2.3) provides per-client rate limiting but does not constitute a DoS defense.
+
+#### 7.7.5 Forward Secrecy
+
+**Informative:** TLS 1.3 provides forward secrecy at the transport layer via ephemeral key exchange. Compromise of a long-term TLS private key does not retroactively expose previously recorded transport traffic.
+
+Payload encryption (Section 7.6) uses symmetric AEAD algorithms. Symmetric encryption does not inherently provide forward secrecy — if the symmetric key is compromised, all messages encrypted under that key are exposed. Forward secrecy at the payload layer requires key rotation: after rotating to a new key version (tracked by Property `0x3C`), messages encrypted under the old key remain at risk, but future messages are protected. Key rotation procedures are implementation-defined (Section 7.6.5).
+
+---
+
+### 7.8 QoS and Operational Interactions
+
+This section addresses how payload encryption and v6.0 stream semantics interact with MQTT QoS levels and operational features including retained messages, broker bridging, and shared subscriptions.
+
+#### 7.8.1 QoS 0, 1, and 2 Interactions
+
+- **QoS 0 (at most once):** Payload encryption adds no overhead to QoS 0 flows beyond the encryption properties themselves. No PUBACK exchange occurs; encryption properties are included in the PUBLISH packet and delivered (or not) per normal QoS 0 semantics.
+- **QoS 1 (at least once):** Encrypted payloads interact with PUBACK exactly as plaintext payloads do. The broker issues PUBACK after persisting the message to the queue; it does not inspect or validate the payload content. The PUBACK confirms persistence, not successful decryption.
+- **QoS 2 (exactly once):** The PUBREC/PUBREL/PUBCOMP handshake is unaffected by payload encryption. The broker stores the encrypted payload and participates in the QoS 2 handshake without decrypting. The AEAD authentication tag is not validated by the broker; tag verification is performed by the subscriber after decryption.
+- **Normative:** A Broker MUST NOT fail a QoS handshake (PUBACK, PUBREC, PUBREL, or PUBCOMP) on the basis of unrecognized payload content or the presence of payload encryption properties (`0x3A`, `0x3B`, `0x3C`).
+
+#### 7.8.2 Retained Messages
+
+- **Normative:** A Broker MAY store encrypted retained messages. The broker stores the ciphertext and encryption properties (`0x3A`, `0x3B`, `0x3C`) as-is, without inspection or modification.
+- **Normative:** If the key identified by Payload Key ID (`0x3A`) is rotated after a retained message is stored, a subscriber that receives the retained message MUST use the Key Version (`0x3C`) to identify the correct decryption key. A retained message encrypted under a key version that has been revoked will remain undecryptable until the retained message is replaced by a new PUBLISH.
+- **Informative:** Operators SHOULD carefully consider key rotation implications before using encrypted retained messages. A retained message encrypted with a revoked key will remain stored at the broker but will be unreadable by subscribers until the retained message is replaced with a freshly encrypted version.
+
+#### 7.8.3 Broker Bridging
+
+- **Normative:** When a broker bridge forwards a `$queue/` message to another broker, it MUST forward all PUBLISH properties unchanged, including payload encryption properties (`0x3A`, `0x3B`, `0x3C`).
+- **Normative:** A bridging broker MUST NOT attempt to decrypt or re-encrypt forwarded payloads.
+- **Normative:** Stream Sequence Numbers (`0x30`) MUST be preserved across broker bridges without modification. A bridge that rewrites sequence numbers breaks consumer gap detection and High-Watermark tracking on the downstream broker.
+
+#### 7.8.4 Shared Subscriptions (non-SQMC)
+
+- For standard `$share/` subscriptions carrying encrypted payloads, the broker distributes the encrypted payload to exactly one subscriber per the standard shared subscription rules (MQTT v5.0 Section 4.8.2). The selected subscriber decrypts using the key metadata properties included in the PUBLISH.
+- **Normative:** All consumers in a shared subscription group accessing the same `$queue/` MUST have access to the same symmetric key, identified by Key ID (`0x3A`). Ensuring that all group members hold the correct key is an application-layer responsibility (Section 7.6.5).
+
+#### 7.8.5 Observability and Debugging
+
+- **Informative:** Payload encryption makes broker-side payload inspection, stream processing plugins, and content-based routing unavailable for encrypted messages. Operators SHOULD ensure that all routing information required for message delivery is expressed in the topic string, not in the payload, before enabling payload encryption.
+- **Informative:** Observability tooling (Node-RED, broker management UIs, protocol analyzers) will display encrypted payloads as opaque binary blobs. This is by design — the security model requires that the broker be unable to read payload content. Debugging of encrypted message flows requires access to the application-layer decryption key and must be performed at the subscriber, not at the broker.
+
 ---
 
 ## Annex A: SECS/GEM Mapping

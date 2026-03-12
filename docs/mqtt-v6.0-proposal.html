@@ -251,6 +251,11 @@ TLS 1.3 Requirement</a></li>
 <li><a href="#optional-payload-encryption-zero-trust"
 id="toc-optional-payload-encryption-zero-trust">7.6 Optional Payload
 Encryption (Zero Trust)</a></li>
+<li><a href="#threat-model" id="toc-threat-model">7.7 Threat
+Model</a></li>
+<li><a href="#qos-and-operational-interactions"
+id="toc-qos-and-operational-interactions">7.8 QoS and Operational
+Interactions</a></li>
 </ul></li>
 <li><a href="#annex-a-secsgem-mapping"
 id="toc-annex-a-secsgem-mapping">Annex A: SECS/GEM Mapping</a>
@@ -826,6 +831,39 @@ id="toc-disadvantages-1">Disadvantages</a></li>
 id="toc-analogues-in-other-protocol-ecosystems">8. Analogues in Other
 Protocol Ecosystems</a></li>
 <li><a href="#references-3" id="toc-references-3">References</a></li>
+</ul></li>
+<li><a href="#tc-positioning-strategy-from-mqtt-6.0-to-mqtt-rssp"
+id="toc-tc-positioning-strategy-from-mqtt-6.0-to-mqtt-rssp">TC
+Positioning Strategy: From “MQTT 6.0” to MQTT-RSSP</a>
+<ul>
+<li><a href="#the-strategic-problem" id="toc-the-strategic-problem">1.
+The Strategic Problem</a></li>
+<li><a href="#the-reframe-two-track-positioning"
+id="toc-the-reframe-two-track-positioning">2. The Reframe: Two-Track
+Positioning</a></li>
+<li><a href="#answering-the-two-fatal-questions"
+id="toc-answering-the-two-fatal-questions">3. Answering the Two Fatal
+Questions</a>
+<ul>
+<li><a href="#q1-why-isnt-tls-already-sufficient"
+id="toc-q1-why-isnt-tls-already-sufficient">Q1: “Why isn’t TLS already
+sufficient?”</a></li>
+<li><a href="#q2-who-manages-the-keys"
+id="toc-q2-who-manages-the-keys">Q2: “Who manages the keys?”</a></li>
+</ul></li>
+<li><a href="#feature-by-feature-tc-positioning"
+id="toc-feature-by-feature-tc-positioning">4. Feature-by-Feature TC
+Positioning</a></li>
+<li><a href="#what-to-avoid-saying" id="toc-what-to-avoid-saying">5.
+What to Avoid Saying</a></li>
+<li><a href="#relationship-to-existing-lift-documents"
+id="toc-relationship-to-existing-lift-documents">6. Relationship to
+Existing Lift Documents</a></li>
+<li><a href="#estimated-tc-acceptance-probability"
+id="toc-estimated-tc-acceptance-probability">7. Estimated TC Acceptance
+Probability</a></li>
+<li><a href="#recommended-next-steps" id="toc-recommended-next-steps">8.
+Recommended Next Steps</a></li>
 </ul></li>
 </ul>
 </nav>
@@ -3011,6 +3049,256 @@ triggered. Any failure is at the application layer (the client receives
 ciphertext it cannot interpret), not at the protocol layer. This
 provides a defense-in-depth guarantee: the handshake gate is the primary
 protection; the unknown-property rule is the fallback.</p>
+<h3 id="threat-model">7.7 Threat Model</h3>
+<p>This section provides a formal threat model for MQTT v6.0. It
+identifies the actors, trust boundaries, threats addressed by this
+specification, and threats that are explicitly out of scope.</p>
+<h4 id="actors">7.7.1 Actors</h4>
+<table>
+<colgroup>
+<col style="width: 35%" />
+<col style="width: 65%" />
+</colgroup>
+<thead>
+<tr>
+<th>Actor</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Publisher</strong></td>
+<td>A trusted endpoint that produces messages and publishes them to the
+broker.</td>
+</tr>
+<tr>
+<td><strong>Subscriber</strong></td>
+<td>A trusted endpoint that consumes messages delivered by the
+broker.</td>
+</tr>
+<tr>
+<td><strong>Broker</strong></td>
+<td>A semi-trusted router. The broker may be multi-tenant, cloud-hosted,
+or federated. It is trusted for routing, QoS, and session management,
+but is treated as an untrusted intermediary for payload content when
+payload encryption (Section 7.6) is in use.</td>
+</tr>
+<tr>
+<td><strong>Network Adversary</strong></td>
+<td>A party that can observe or intercept traffic at the transport layer
+between any two actors.</td>
+</tr>
+<tr>
+<td><strong>Rogue Broker Administrator</strong></td>
+<td>An internal threat — a party with administrative access to broker
+infrastructure who may attempt to read, modify, or replay message
+content.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="trust-boundaries">7.7.2 Trust Boundaries</h4>
+<ul>
+<li><strong>Publisher→Broker transport:</strong> Secured by TLS 1.3
+(Section 7.5). The network adversary cannot observe or tamper with this
+hop.</li>
+<li><strong>Broker→Subscriber transport:</strong> Secured by TLS 1.3
+(Section 7.5). The network adversary cannot observe or tamper with this
+hop.</li>
+<li><strong>Publisher→Subscriber end-to-end:</strong> Secured by payload
+encryption (Section 7.6) when deployed. The broker receives and forwards
+ciphertext it cannot decrypt. This trust boundary holds even against the
+rogue broker administrator.</li>
+<li><strong>Broker as routing intermediary:</strong> The broker is
+trusted to route, sequence, and deliver messages correctly. It is not
+trusted to maintain payload confidentiality when Section 7.6 encryption
+is not in use.</li>
+</ul>
+<h4 id="threats-addressed">7.7.3 Threats Addressed</h4>
+<table>
+<colgroup>
+<col style="width: 13%" />
+<col style="width: 36%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>#</th>
+<th>Threat</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>Network eavesdropping</strong> — a network adversary
+intercepts the transport stream to read message content</td>
+<td>Mitigated by TLS 1.3 (Section 7.5), which encrypts all traffic
+between client and broker</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>Broker payload inspection</strong> — the broker operator or
+a rogue administrator reads sensitive payload content</td>
+<td>Mitigated by payload encryption (Section 7.6); the broker holds
+ciphertext and cannot recover plaintext without the application-layer
+key</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Message replay</strong> — an adversary records and
+retransmits a previously delivered message</td>
+<td>Mitigated by Stream Epoch (Section 4.3) combined with nonce
+uniqueness (Section 7.6.4); consumers reject messages whose sequence
+number falls at or below the High-Watermark, and the AEAD nonce prevents
+ciphertext reuse</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>Message gap / loss detection</strong> — messages are
+silently dropped between publisher and subscriber without detection</td>
+<td>Mitigated by Stream Sequence Numbers (Section 4.3); consumers detect
+gaps by observing discontinuities in the monotonic sequence</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Broker message tampering</strong> — the broker or a network
+adversary modifies payload content in transit</td>
+<td>Mitigated by the AEAD authentication tag (Section 7.6.4); any
+modification to the ciphertext or associated data causes tag
+verification to fail at the subscriber</td>
+</tr>
+</tbody>
+</table>
+<h4 id="threats-not-addressed-out-of-scope">7.7.4 Threats Not Addressed
+(Out of Scope)</h4>
+<p>The following threats are explicitly outside the scope of this
+specification:</p>
+<ul>
+<li><strong>Key distribution and rotation:</strong> The means by which
+publishers and subscribers obtain, exchange, rotate, and revoke
+symmetric keys is an application-layer responsibility. This
+specification defines only the metadata properties that identify which
+key was used (Section 7.6.5).</li>
+<li><strong>Broker ACL bypass:</strong> Authorization enforcement —
+ensuring that a given client is permitted to publish or subscribe to a
+given topic — is the responsibility of the broker’s authorization layer.
+This specification defines that ACLs MUST be enforced (Section 4.1.4,
+Section 7.1) but does not define the authorization mechanism.</li>
+<li><strong>Physical device compromise:</strong> An adversary with
+physical access to a publisher or subscriber endpoint can extract keys
+or inject false messages at the application layer. This is outside the
+protocol threat model.</li>
+<li><strong>Denial of service at the broker tier:</strong> Volumetric
+attacks, resource exhaustion, and distributed denial-of-service attacks
+against broker infrastructure are outside the scope of this
+specification. The Throughput Limit property (Section 2.2.3) provides
+per-client rate limiting but does not constitute a DoS defense.</li>
+</ul>
+<h4 id="forward-secrecy">7.7.5 Forward Secrecy</h4>
+<p><strong>Informative:</strong> TLS 1.3 provides forward secrecy at the
+transport layer via ephemeral key exchange. Compromise of a long-term
+TLS private key does not retroactively expose previously recorded
+transport traffic.</p>
+<p>Payload encryption (Section 7.6) uses symmetric AEAD algorithms.
+Symmetric encryption does not inherently provide forward secrecy — if
+the symmetric key is compromised, all messages encrypted under that key
+are exposed. Forward secrecy at the payload layer requires key rotation:
+after rotating to a new key version (tracked by Property
+<code>0x3C</code>), messages encrypted under the old key remain at risk,
+but future messages are protected. Key rotation procedures are
+implementation-defined (Section 7.6.5).</p>
+<hr />
+<h3 id="qos-and-operational-interactions">7.8 QoS and Operational
+Interactions</h3>
+<p>This section addresses how payload encryption and v6.0 stream
+semantics interact with MQTT QoS levels and operational features
+including retained messages, broker bridging, and shared
+subscriptions.</p>
+<h4 id="qos-0-1-and-2-interactions">7.8.1 QoS 0, 1, and 2
+Interactions</h4>
+<ul>
+<li><strong>QoS 0 (at most once):</strong> Payload encryption adds no
+overhead to QoS 0 flows beyond the encryption properties themselves. No
+PUBACK exchange occurs; encryption properties are included in the
+PUBLISH packet and delivered (or not) per normal QoS 0 semantics.</li>
+<li><strong>QoS 1 (at least once):</strong> Encrypted payloads interact
+with PUBACK exactly as plaintext payloads do. The broker issues PUBACK
+after persisting the message to the queue; it does not inspect or
+validate the payload content. The PUBACK confirms persistence, not
+successful decryption.</li>
+<li><strong>QoS 2 (exactly once):</strong> The PUBREC/PUBREL/PUBCOMP
+handshake is unaffected by payload encryption. The broker stores the
+encrypted payload and participates in the QoS 2 handshake without
+decrypting. The AEAD authentication tag is not validated by the broker;
+tag verification is performed by the subscriber after decryption.</li>
+<li><strong>Normative:</strong> A Broker MUST NOT fail a QoS handshake
+(PUBACK, PUBREC, PUBREL, or PUBCOMP) on the basis of unrecognized
+payload content or the presence of payload encryption properties
+(<code>0x3A</code>, <code>0x3B</code>, <code>0x3C</code>).</li>
+</ul>
+<h4 id="retained-messages">7.8.2 Retained Messages</h4>
+<ul>
+<li><strong>Normative:</strong> A Broker MAY store encrypted retained
+messages. The broker stores the ciphertext and encryption properties
+(<code>0x3A</code>, <code>0x3B</code>, <code>0x3C</code>) as-is, without
+inspection or modification.</li>
+<li><strong>Normative:</strong> If the key identified by Payload Key ID
+(<code>0x3A</code>) is rotated after a retained message is stored, a
+subscriber that receives the retained message MUST use the Key Version
+(<code>0x3C</code>) to identify the correct decryption key. A retained
+message encrypted under a key version that has been revoked will remain
+undecryptable until the retained message is replaced by a new
+PUBLISH.</li>
+<li><strong>Informative:</strong> Operators SHOULD carefully consider
+key rotation implications before using encrypted retained messages. A
+retained message encrypted with a revoked key will remain stored at the
+broker but will be unreadable by subscribers until the retained message
+is replaced with a freshly encrypted version.</li>
+</ul>
+<h4 id="broker-bridging">7.8.3 Broker Bridging</h4>
+<ul>
+<li><strong>Normative:</strong> When a broker bridge forwards a
+<code>$queue/</code> message to another broker, it MUST forward all
+PUBLISH properties unchanged, including payload encryption properties
+(<code>0x3A</code>, <code>0x3B</code>, <code>0x3C</code>).</li>
+<li><strong>Normative:</strong> A bridging broker MUST NOT attempt to
+decrypt or re-encrypt forwarded payloads.</li>
+<li><strong>Normative:</strong> Stream Sequence Numbers
+(<code>0x30</code>) MUST be preserved across broker bridges without
+modification. A bridge that rewrites sequence numbers breaks consumer
+gap detection and High-Watermark tracking on the downstream broker.</li>
+</ul>
+<h4 id="shared-subscriptions-non-sqmc">7.8.4 Shared Subscriptions
+(non-SQMC)</h4>
+<ul>
+<li>For standard <code>$share/</code> subscriptions carrying encrypted
+payloads, the broker distributes the encrypted payload to exactly one
+subscriber per the standard shared subscription rules (MQTT v5.0 Section
+4.8.2). The selected subscriber decrypts using the key metadata
+properties included in the PUBLISH.</li>
+<li><strong>Normative:</strong> All consumers in a shared subscription
+group accessing the same <code>$queue/</code> MUST have access to the
+same symmetric key, identified by Key ID (<code>0x3A</code>). Ensuring
+that all group members hold the correct key is an application-layer
+responsibility (Section 7.6.5).</li>
+</ul>
+<h4 id="observability-and-debugging">7.8.5 Observability and
+Debugging</h4>
+<ul>
+<li><strong>Informative:</strong> Payload encryption makes broker-side
+payload inspection, stream processing plugins, and content-based routing
+unavailable for encrypted messages. Operators SHOULD ensure that all
+routing information required for message delivery is expressed in the
+topic string, not in the payload, before enabling payload
+encryption.</li>
+<li><strong>Informative:</strong> Observability tooling (Node-RED,
+broker management UIs, protocol analyzers) will display encrypted
+payloads as opaque binary blobs. This is by design — the security model
+requires that the broker be unable to read payload content. Debugging of
+encrypted message flows requires access to the application-layer
+decryption key and must be performed at the subscriber, not at the
+broker.</li>
+</ul>
 <hr />
 <h2 id="annex-a-secsgem-mapping">Annex A: SECS/GEM Mapping</h2>
 <p>For semiconductor manufacturing environments using SECS/GEM (SEMI
@@ -7931,5 +8219,318 @@ Standard</a></li>
 <code>docs/critiques-and-rebuttals.md</code></li>
 <li>Alternative Approaches: <code>docs/alternatives.md</code></li>
 </ul>
+<h1 id="tc-positioning-strategy-from-mqtt-6.0-to-mqtt-rssp">TC
+Positioning Strategy: From “MQTT 6.0” to MQTT-RSSP</h1>
+<blockquote>
+<p><strong>Author:</strong> Bill Sommers, AI Solutions Lead, HiveMQ,
+Inc. <strong>Date:</strong> March 2026 <strong>Status:</strong> Internal
+strategy document — not for external distribution
+<strong>Context:</strong> Synthesizes an external ChatGPT technical
+review into a concrete committee positioning strategy</p>
+</blockquote>
+<hr />
+<h2 id="the-strategic-problem">1. The Strategic Problem</h2>
+<p>The label “MQTT 6.0” is, by itself, a near-fatal framing for an OASIS
+TC submission. Major version numbers carry a specific meaning in
+standards bodies: breaking changes, years of TC work, ecosystem-wide
+migration costs, and competitive fragmentation while the draft is in
+flight. The OASIS MQTT TC spent roughly four years taking MQTT 5.0 from
+proposal to ratification. Asking the committee to open a “6.0” track is
+asking them to sign up for another four years — before they have read a
+single sentence of the proposal.</p>
+<p>This resistance is not irrational. MQTT 5.0 was explicitly designed
+with User Properties, an extensible property ID space, and a reserved
+property range precisely to enable future extensions <em>without</em>
+requiring a version bump. Members of the TC will read “MQTT 6.0” and
+their first question will be: “Why couldn’t this be done with User
+Properties and a profile?” If the answer to that question is not
+airtight, the proposal dies in the first review session.</p>
+<p>The external review is correct: the current framing triggers maximum
+TC resistance before the technical merit of the proposal gets a fair
+hearing. The fix is not to improve the technical arguments — those are
+already solid, as the rebuttals document demonstrates — it is to change
+the frame entirely so the committee evaluates the proposal on its merits
+rather than its version number.</p>
+<hr />
+<h2 id="the-reframe-two-track-positioning">2. The Reframe: Two-Track
+Positioning</h2>
+<p>The core insight from the external review is that the proposal
+contains two separable things that should be presented through two
+separate lenses:</p>
+<p><strong>Track 1 — For OASIS TC submission:</strong> Position the
+proposal as the <strong>MQTT Reliable Secure Streams Profile
+(MQTT-RSSP)</strong> — an interoperability profile fully compatible with
+MQTT 3.1.1 and MQTT 5.0, requiring no changes to the broker wire
+protocol, implemented via User Properties and payload conventions that
+any conformant MQTT 5.0 broker can forward without modification.</p>
+<p><strong>Track 2 — For HiveMQ product:</strong> The broker-side
+extensions — native <code>$queue/</code> persistence, Virtual FETCH
+enforcement, SQMC consumer mode arbitration, and Epoch management — are
+HiveMQ’s above-and-beyond implementation of the profile. They are not
+required for MQTT-RSSP profile conformance; they are value-added broker
+behaviors that HiveMQ ships as a competitive differentiator.</p>
+<p>This two-track structure maps directly onto the existing lift
+documents. The “application layer profile” in Option A and Option C is
+exactly MQTT-RSSP. The MQTT 6.0 transport extension spec becomes the
+HiveMQ-specific broker optimization layer. What gets submitted to OASIS
+is the profile; what HiveMQ ships as a product is the native broker
+support for that profile.</p>
+<p>The framing shift is not cosmetic. Under the MQTT-RSSP frame:</p>
+<ul>
+<li>A client running MQTT-RSSP on a Mosquitto broker today — using only
+User Properties and payload conventions — is a conformant
+implementation</li>
+<li>A client running MQTT-RSSP on HiveMQ with native
+<code>$queue/</code> support gets better performance, lower latency, and
+stronger durability guarantees — but is still running the same
+profile</li>
+<li>The TC is being asked to ratify an interoperability spec for a
+pattern that already exists in production (Sparkplug B sequence numbers,
+application-layer idempotency tables, session resume logic), not to
+approve a new protocol version</li>
+</ul>
+<p><strong>The compatibility statement to include in every
+document:</strong></p>
+<blockquote>
+<p>“This profile introduces no changes to the MQTT wire protocol and is
+fully interoperable with existing MQTT 3.1.1 and MQTT 5.0 brokers.”</p>
+</blockquote>
+<p>That single sentence removes approximately 70% of the standard
+committee objections before the technical review begins.</p>
+<hr />
+<h2 id="answering-the-two-fatal-questions">3. Answering the Two Fatal
+Questions</h2>
+<p>Two questions will be raised in the first TC review session. If they
+are not answered concisely and confidently, they become blockers that
+derail the entire proposal. Do not bury the answers in appendices — put
+them in the abstract.</p>
+<h3 id="q1-why-isnt-tls-already-sufficient">Q1: “Why isn’t TLS already
+sufficient?”</h3>
+<p>TLS protects the transport hop — client to broker to subscriber. It
+terminates at the broker. In a multi-tenant cloud broker, a federated
+bridge deployment, or any infrastructure where the broker is operated by
+a third party, TLS provides no protection against the broker itself. The
+broker decrypts, reads, re-encrypts, and forwards. For semiconductor
+equipment vendors shipping process recipes to tools on a customer’s
+factory floor, the cloud broker IS an attacker surface — not a
+hypothetical one, a contractual one: the broker operator’s SLA
+explicitly disclaims liability for payload content.</p>
+<p>MQTT-RSSP payload encryption (Properties 0x3A-0x3C) protects the data
+across the entire messaging lifecycle, not just the network path. The
+broker forwards an opaque payload with metadata. It cannot read process
+parameters, safety-critical commands, or proprietary control sequences.
+The pattern is precise: TLS = network confidentiality; MQTT-RSSP = data
+confidentiality. TLS and MQTT-RSSP are complementary, not redundant.</p>
+<h3 id="q2-who-manages-the-keys">Q2: “Who manages the keys?”</h3>
+<p>The profile defines only how encrypted payloads reference keys: a
+<code>key_id</code>, an <code>algorithm</code> identifier, and a
+<code>key_version</code>. Key distribution, rotation, and revocation are
+explicitly out of scope. Deployments integrate with whatever key
+management they already operate — device provisioning systems,
+enterprise PKI, HSMs, SPIFFE/SPIRE workload identity. The same design
+pattern as TLS SNI: the protocol references an identity, the PKI manages
+it. MQTT-RSSP does not introduce a new key management problem; it
+introduces a standard envelope for referencing keys from whatever system
+already manages them.</p>
+<hr />
+<h2 id="feature-by-feature-tc-positioning">4. Feature-by-Feature TC
+Positioning</h2>
+<p>Each feature needs a two-to-three sentence TC pitch that connects it
+to a concrete, documented ecosystem problem. Abstract arguments about
+reliability do not move standards committees; specific evidence of
+fragmentation does.</p>
+<p><strong>Stream Sequence Numbers (Property 0x30)</strong></p>
+<p>This standardizes the single most-reimplemented pattern in IIoT MQTT
+deployments. Every Eclipse Sparkplug B deployment already implements a
+64-bit <code>seq</code> field in protobuf payloads for exactly this
+purpose — gap detection and ordered delivery. MQTT-RSSP moves the
+sequence number from a payload-embedded convention into a standard
+envelope property so any client library can implement it once,
+interoperably, without a custom serialization format.</p>
+<p><strong>Stream Epoch (Property 0x35)</strong></p>
+<p>A simple replay protection mechanism across device restarts and
+broker failovers, analogous to TLS session tickets. The Epoch is a
+monotonically increasing uint16 that subscribers use to detect and
+discard stale replays and to know when their local idempotency state is
+no longer valid. It requires no broker coordination beyond incrementing
+a counter on state discontinuity events; a single-node Mosquitto
+instance can implement it correctly. Zero broker architecture changes
+required.</p>
+<p><strong>Payload Encryption (Properties 0x3A-0x3C)</strong></p>
+<p>Three optional User Properties constitute a broker-transparent
+encrypted envelope. No broker changes. No key material in the protocol.
+Solves the multi-tenant broker trust problem that every large industrial
+MQTT customer has raised independently — the problem that today forces
+them to implement ad-hoc payload encryption with no standard
+key-reference format, making interoperability between equipment vendors
+impossible.</p>
+<p><strong>SQMC (Single-Queue Multi-Consumer)</strong></p>
+<p>This is the most controversial feature; it must be framed carefully.
+Do not present it as a QoS replacement. Present it as application-level
+verifiable delivery confirmation for safety-critical command streams.
+MQTT QoS 1 and QoS 2 guarantee delivery semantics at the transport
+layer. SQMC provides cryptographic proof — via the sequence number and
+acknowledgment protocol — that the correct subscriber received and
+validated the correct message. This is required for SECS/GEM S2F21
+process start command handshakes, IEC 61850 grid protection relay
+sequences, and other safety-critical applications where “I sent it and
+the broker said OK” is not a sufficient guarantee.</p>
+<hr />
+<h2 id="what-to-avoid-saying">5. What to Avoid Saying</h2>
+<p>Language matters in TC submissions. Certain phrases activate
+pattern-matching against past standards failures and produce reflexive
+resistance before the technical argument is heard. For each phrase to
+avoid, there is a preferred alternative that conveys the same technical
+content without the political cost.</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Avoid</th>
+<th>Use instead</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>“MQTT 6.0”</td>
+<td>“MQTT Reliable Secure Streams Profile (MQTT-RSSP)”</td>
+</tr>
+<tr>
+<td>“major protocol revision”</td>
+<td>“interoperability profile”</td>
+</tr>
+<tr>
+<td>“new packet type”</td>
+<td>“payload convention / User Property extension”</td>
+</tr>
+<tr>
+<td>“breaking change”</td>
+<td>“additive, opt-in extension”</td>
+</tr>
+<tr>
+<td>“broker encryption support”</td>
+<td>“broker-transparent security”</td>
+</tr>
+<tr>
+<td>“we need a new version”</td>
+<td>“we are standardizing patterns already in production”</td>
+</tr>
+<tr>
+<td>“replaces MQTT 5.0 features”</td>
+<td>“complements existing MQTT 5.0 semantics”</td>
+</tr>
+</tbody>
+</table>
+<p>The last two are particularly important. The argument “we are
+standardizing patterns already in production” is both true and
+persuasive: Sparkplug B sequence numbers, application-layer idempotency
+tables, and session resume logic are in production at scale today.
+MQTT-RSSP is a standardization of existing practice, not a proposal to
+change practice.</p>
+<hr />
+<h2 id="relationship-to-existing-lift-documents">6. Relationship to
+Existing Lift Documents</h2>
+<p>The MQTT-RSSP reframe maps cleanly onto the lift document structure.
+Under the Option C architecture:</p>
+<ul>
+<li><p><strong>MQTT 6.0 transport extension</strong> (broker
+obligations: Property 0x30/0x35 assignment, <code>$queue/</code>
+persistence, Virtual FETCH enforcement, SQMC arbitration) becomes the
+HiveMQ product layer — the above-and-beyond broker implementation that
+makes everything work natively, but is not required for profile
+conformance.</p></li>
+<li><p><strong>MQTT Stream 1.0 application protocol</strong> (client
+obligations: gap detection state machine, epoch resync procedure,
+high-watermark persistence, exactly-once workflow) becomes the normative
+content of the MQTT-RSSP OASIS submission.</p></li>
+</ul>
+<p>In other words: what gets submitted to OASIS is essentially the MQTT
+Stream 1.0 spec from lift-option-c, rebranded as MQTT-RSSP and framed as
+a profile over MQTT 5.0 rather than a layer above MQTT 6.0. The
+broker-side primitive requirements (Property 0x30 assignment,
+<code>$queue/</code> persistence) become SHOULD/RECOMMENDED behaviors
+for brokers that wish to natively support MQTT-RSSP, rather than MUST
+requirements for a new protocol level.</p>
+<p>This is not a retreat from the technical proposal. The technical
+content is identical. The OASIS submission surface is dramatically
+smaller, the risk profile for TC reviewers is dramatically lower, and
+the path to ratification is dramatically shorter.</p>
+<hr />
+<h2 id="estimated-tc-acceptance-probability">7. Estimated TC Acceptance
+Probability</h2>
+<p>Based on the external review’s assessment and the positioning
+analysis above:</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Framing</th>
+<th>Acceptance Probability</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>“MQTT 6.0 protocol revision”</td>
+<td>~10-15%</td>
+<td>Triggers maximum resistance before technical merit is heard; implies
+breaking changes, years of TC work, and ecosystem disruption; competes
+with TC members’ investment in MQTT 5.0</td>
+</tr>
+<tr>
+<td>“MQTT Reliable Secure Streams Profile (MQTT-RSSP)”</td>
+<td>~50-70%</td>
+<td>Profile framing signals low risk; broker transparency removes
+ecosystem disruption concerns; standardizing documented fragmentation
+(Sparkplug, ad-hoc sequence numbers) is a recognized TC mandate</td>
+</tr>
+</tbody>
+</table>
+<p>The delta between these two outcomes is not in the technical proposal
+— the proposal is sound in either frame. The delta is entirely in how
+the TC perceives its own workload and risk exposure. MQTT-RSSP asks the
+TC to ratify an interoperability profile for patterns already in
+production. MQTT 6.0 asks the TC to approve a new protocol version.
+These are structurally different asks with structurally different
+acceptance rates.</p>
+<p>The ~50-70% range under MQTT-RSSP framing is conditional on answering
+the two fatal questions (TLS sufficiency, key management) concisely in
+the abstract, and on keeping the payload encryption feature clearly
+marked as optional. If SQMC is submitted as a separate follow-on
+proposal rather than bundled in the initial submission, the acceptance
+probability for the core profile (Stream Sequence + Epoch + payload
+encryption envelope) likely rises above 70%.</p>
+<hr />
+<h2 id="recommended-next-steps">8. Recommended Next Steps</h2>
+<ol type="1">
+<li><p><strong>Rename all external-facing documents</strong> to use
+“MQTT-RSSP” or “MQTT Reliable Secure Streams Profile” as the primary
+identifier. Keep “MQTT 6.0” as a parenthetical for internal reference
+only.</p></li>
+<li><p><strong>Add the compatibility statement</strong> (“This profile
+introduces no changes to the MQTT wire protocol…”) to the abstract or
+first paragraph of every document intended for TC review.</p></li>
+<li><p><strong>Prepend the TLS question answer</strong> to the executive
+summary before the feature list. TC reviewers will ask it; answer it
+before they need to.</p></li>
+<li><p><strong>Consider a two-phase submission</strong>: Phase 1 covers
+Stream Sequence Numbers, Stream Epoch, and the payload encryption
+envelope (the broker-transparent features). Phase 2 covers SQMC. The
+Phase 1 submission has a cleaner “broker transparency” story and a
+higher acceptance probability. SQMC requires broker-side enforcement and
+is the most controversial feature; letting Phase 1 establish credibility
+before introducing it is strategically sound.</p></li>
+<li><p><strong>Align the lift documents</strong>: Update
+lift-option-c.md to reflect that “MQTT Stream 1.0” IS the MQTT-RSSP
+OASIS submission. The naming should be consistent before the TC review
+package is assembled.</p></li>
+</ol>
 </body>
 </html>

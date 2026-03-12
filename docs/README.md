@@ -38,6 +38,9 @@
 17. [Option B: Protocol Spec + Normative Annex A](lift-option-b.md)
 18. [Option C: Two Independent Specifications](lift-option-c.md)
 
+### Standards Committee Strategy
+19. [TC Positioning Strategy — MQTT-RSSP Reframe & Acceptance Playbook](tc-positioning-strategy.md)
+
 ### Reference Implementations
 14. [Python v6.0 Shim (`gmqtt`)](../src/python/mqtt_v6_shim.py)
 15. [Protobuf Schema](../src/proto/mqtt_v6.proto)
